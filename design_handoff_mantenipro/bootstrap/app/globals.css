@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    height: 100%;
+  }
+  body {
+    background: theme("colors.bg-tertiary");
+    color: theme("colors.text-primary");
+    font-family: theme("fontFamily.sans");
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,0,0,.10); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,.20); }
+}
+
+@layer components {
+  /* Tabla compacta estilo ManteniPro */
+  .mp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .mp-table th {
+    text-align: left;
+    font-weight: 500;
+    color: theme("colors.text-tertiary");
+    padding: 8px;
+    border-bottom: 0.5px solid theme("colors.border.DEFAULT");
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+  .mp-table td {
+    padding: 11px 8px;
+    border-bottom: 0.5px solid theme("colors.border.DEFAULT");
+    vertical-align: middle;
+  }
+  .mp-table tbody tr {
+    transition: background .12s;
+  }
+  .mp-table tbody tr:hover {
+    background: theme("colors.bg-secondary");
+  }
+}
