@@ -10,7 +10,7 @@ import { shortenSucursal } from "@/lib/utils";
 import { Badge } from "@/components/atoms/badge";
 import { toast } from "sonner";
 import { cambiarRolUsuario, toggleActivoUsuario, invitarUsuario, editarUsuario, eliminarUsuario, cambiarPassword } from "@/lib/actions/usuario";
-import { asignarZonaSucursal } from "@/lib/actions/sucursal";
+import { asignarZonaSucursal, crearSucursal, editarSucursal, toggleActivaSucursal, eliminarSucursal } from "@/lib/actions/sucursal";
 import { useSession } from "next-auth/react";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -21,6 +21,7 @@ type SucursalData = {
   id:         string;
   nombre:     string;
   formato:    string;
+  direccion?: string;
   activa:     boolean;
   zonaId:     string | null;
   zonaNombre: string | null;
@@ -69,6 +70,7 @@ const FORMATO_LABEL: Record<string, string> = {
   DRIVE_THRU:   "Drive Thru",
   KIOSKO:       "Kiosko",
 };
+const FORMATOS = ["STANDARD", "DRIVE_THRU", "FOOD_COURT", "DARK_KITCHEN", "KIOSKO"] as const;
 
 const ROLES = ["GERENTE_OPERACIONES", "GERENTE_SUCURSAL", "TECNICO", "TRABAJADOR"] as const;
 
@@ -140,69 +142,221 @@ function TabEmpresa({ empresa, total }: { empresa: EmpresaData; total: number })
   );
 }
 
-// ── Tab: Sucursales ────────────────────────────────────────────
+// ── Modal: Sucursal (Crear / Editar) ──────────────────────────
 
-function TabSucursales({ sucursales, zonas }: { sucursales: SucursalData[]; zonas: ZonaData[] }) {
-  const [lista, setLista] = useState<SucursalData[]>(sucursales);
-  const [loadingId, setLoadingId] = useState<string | null>(null);
-  const activas   = lista.filter((s) => s.activa).length;
-  const inactivas = lista.filter((s) => !s.activa).length;
+function SucursalModal({
+  sucursal,
+  zonas,
+  onClose,
+  onSaved,
+}: {
+  sucursal:  SucursalData | null;
+  zonas:     ZonaData[];
+  onClose:   () => void;
+  onSaved:   (s: SucursalData) => void;
+}) {
+  const esEdicion = !!sucursal;
+  const [nombre,    setNombre]    = useState(sucursal?.nombre    ?? "");
+  const [formato,   setFormato]   = useState(sucursal?.formato   ?? "STANDARD");
+  const [direccion, setDireccion] = useState(sucursal?.direccion ?? "");
+  const [zonaId,    setZonaId]    = useState(sucursal?.zonaId    ?? "");
+  const [loading,   setLoading]   = useState(false);
 
-  async function handleZona(sucId: string, zonaId: string) {
-    setLoadingId(sucId);
-    const result = await asignarZonaSucursal(sucId, zonaId || null);
-    setLoadingId(null);
-    if (!result.ok) { toast.error("Error", { description: result.error }); return; }
-    const zona = zonas.find((z) => z.id === zonaId) ?? null;
-    setLista((prev) => prev.map((s) => s.id === sucId
-      ? { ...s, zonaId: zona?.id ?? null, zonaNombre: zona?.nombre ?? null }
-      : s
-    ));
-    toast.success("Zona actualizada");
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+
+    if (esEdicion) {
+      const result = await editarSucursal({
+        sucursalId: sucursal!.id,
+        nombre, formato, direccion,
+        zonaId: zonaId || null,
+      });
+      setLoading(false);
+      if (!result.ok) { toast.error("Error", { description: result.error }); return; }
+      const zona = zonas.find((z) => z.id === zonaId) ?? null;
+      onSaved({ ...sucursal!, nombre: nombre.trim(), formato, zonaId: zona?.id ?? null, zonaNombre: zona?.nombre ?? null });
+      toast.success("Sucursal actualizada");
+    } else {
+      const result = await crearSucursal({ nombre, formato, direccion, zonaId: zonaId || null });
+      setLoading(false);
+      if (!result.ok) { toast.error("Error", { description: result.error }); return; }
+      const zona = zonas.find((z) => z.id === zonaId) ?? null;
+      onSaved({
+        id: (result as { ok: true; id?: string }).id ?? crypto.randomUUID(),
+        nombre: nombre.trim(), formato, activa: true,
+        zonaId: zona?.id ?? null, zonaNombre: zona?.nombre ?? null,
+      });
+      toast.success("Sucursal creada");
+    }
+    onClose();
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex gap-3">
-        {[["Activas", activas], ["Inactivas", inactivas], ["Total", lista.length]].map(([l, v]) => (
-          <div key={String(l)} className="flex-1 rounded-xl border border-border bg-bg-primary p-4">
-            <div className="text-xs text-text-tertiary">{l}</div>
-            <div className="mt-1 text-2xl font-bold text-text-primary">{v}</div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="fixed inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md rounded-2xl border border-border bg-bg-primary p-6 shadow-xl">
+        <h2 className="mb-4 text-base font-semibold text-text-primary">
+          {esEdicion ? "Editar sucursal" : "Nueva sucursal"}
+        </h2>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">Nombre</label>
+            <input required value={nombre} onChange={(e) => setNombre(e.target.value)}
+              placeholder="Ej. Zona Carbonifera — Sabinas"
+              className="h-9 rounded-lg border border-border bg-bg-primary px-3 text-sm text-text-primary placeholder:text-text-tertiary focus:border-brand-blue focus:outline-none" />
           </div>
-        ))}
-      </div>
-
-      <div className="overflow-hidden rounded-xl border border-border bg-bg-primary">
-        <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3 border-b border-border bg-bg-secondary px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
-          <span></span><span>Sucursal</span><span>Zona</span><span>Estado</span>
-        </div>
-        {lista.map((s, i) => {
-          const busy = loadingId === s.id;
-          return (
-            <div key={s.id} className={cn("grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 px-4 py-3", i < lista.length - 1 && "border-b border-border")}>
-              <div className={cn("h-2 w-2 shrink-0 rounded-full", s.activa ? "bg-status-ok-mid" : "bg-text-tertiary")} />
-              <div className="min-w-0">
-                <div className="truncate text-sm font-medium text-text-primary">{s.nombre}</div>
-                <div className="text-xs text-text-tertiary">{FORMATO_LABEL[s.formato] ?? s.formato}</div>
-              </div>
-              <select
-                value={s.zonaId ?? ""}
-                disabled={busy}
-                onChange={(e) => handleZona(s.id, e.target.value)}
-                className="h-7 rounded-md border border-border bg-bg-secondary px-2 text-[11px] text-text-primary focus:border-brand-blue focus:outline-none disabled:opacity-50"
-              >
-                <option value="">Sin zona</option>
-                {zonas.map((z) => <option key={z.id} value={z.id}>{z.nombre}</option>)}
-              </select>
-              {busy
-                ? <Loader2 size={14} className="animate-spin text-text-tertiary" />
-                : <Badge tone={s.activa ? "ok" : "gray"} size="sm">{s.activa ? "Activa" : "Inactiva"}</Badge>
-              }
-            </div>
-          );
-        })}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">Formato</label>
+            <select value={formato} onChange={(e) => setFormato(e.target.value)}
+              className="h-9 rounded-lg border border-border bg-bg-primary px-3 text-sm text-text-primary focus:border-brand-blue focus:outline-none">
+              {FORMATOS.map((f) => <option key={f} value={f}>{FORMATO_LABEL[f]}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">Zona</label>
+            <select value={zonaId} onChange={(e) => setZonaId(e.target.value)}
+              className="h-9 rounded-lg border border-border bg-bg-primary px-3 text-sm text-text-primary focus:border-brand-blue focus:outline-none">
+              <option value="">Sin zona</option>
+              {zonas.map((z) => <option key={z.id} value={z.id}>{z.nombre}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">Dirección <span className="text-text-tertiary">(opcional)</span></label>
+            <input value={direccion} onChange={(e) => setDireccion(e.target.value)}
+              placeholder="Calle, número, colonia"
+              className="h-9 rounded-lg border border-border bg-bg-primary px-3 text-sm text-text-primary placeholder:text-text-tertiary focus:border-brand-blue focus:outline-none" />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose}
+              className="h-9 rounded-lg border border-border px-4 text-sm text-text-secondary hover:bg-bg-secondary">
+              Cancelar
+            </button>
+            <button type="submit" disabled={loading}
+              className="flex h-9 items-center gap-1.5 rounded-lg bg-brand-blue px-4 text-sm font-medium text-white hover:bg-brand-blue/90 disabled:opacity-60">
+              {loading && <Loader2 size={13} className="animate-spin" />}
+              {esEdicion ? "Guardar cambios" : "Crear sucursal"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
+  );
+}
+
+// ── Tab: Sucursales ────────────────────────────────────────────
+
+function TabSucursales({ sucursales: initialSucursales, zonas }: { sucursales: SucursalData[]; zonas: ZonaData[] }) {
+  const [lista,      setLista]      = useState<SucursalData[]>(initialSucursales);
+  const [loadingId,  setLoadingId]  = useState<string | null>(null);
+  const [modalSuc,   setModalSuc]   = useState<SucursalData | null | "nueva">(null);
+
+  const activas   = lista.filter((s) => s.activa).length;
+  const inactivas = lista.filter((s) => !s.activa).length;
+
+  async function handleToggle(sucId: string, activa: boolean) {
+    setLoadingId(sucId);
+    const result = await toggleActivaSucursal(sucId, activa);
+    setLoadingId(null);
+    if (!result.ok) { toast.error("Error", { description: result.error }); return; }
+    setLista((prev) => prev.map((s) => s.id === sucId ? { ...s, activa } : s));
+    toast.success(activa ? "Sucursal activada" : "Sucursal desactivada");
+  }
+
+  async function handleEliminar(sucId: string) {
+    if (!confirm("¿Eliminar esta sucursal? Esta acción no se puede deshacer.")) return;
+    setLoadingId(sucId);
+    const result = await eliminarSucursal(sucId);
+    setLoadingId(null);
+    if (!result.ok) { toast.error("Error", { description: result.error }); return; }
+    setLista((prev) => prev.filter((s) => s.id !== sucId));
+    toast.success("Sucursal eliminada");
+  }
+
+  return (
+    <>
+      <div className="flex flex-col gap-4">
+        {/* KPIs */}
+        <div className="flex gap-3">
+          {([["Activas", activas], ["Inactivas", inactivas], ["Total", lista.length]] as const).map(([l, v]) => (
+            <div key={l} className="flex-1 rounded-xl border border-border bg-bg-primary p-4">
+              <div className="text-xs text-text-tertiary">{l}</div>
+              <div className="mt-1 text-2xl font-bold text-text-primary">{v}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Toolbar */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-text-tertiary">{lista.length} sucursales registradas</span>
+          <button onClick={() => setModalSuc("nueva")}
+            className="flex h-8 items-center gap-1.5 rounded-lg bg-brand-blue px-3 text-sm font-medium text-white hover:bg-brand-blue/90">
+            <Plus size={13} />
+            Nueva sucursal
+          </button>
+        </div>
+
+        {/* Tabla */}
+        <div className="overflow-hidden rounded-xl border border-border bg-bg-primary">
+          <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-3 border-b border-border bg-bg-secondary px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+            <span></span><span>Sucursal</span><span>Zona</span><span>Estado</span><span></span><span></span>
+          </div>
+          {lista.map((s, i) => {
+            const busy = loadingId === s.id;
+            return (
+              <div key={s.id} className={cn(
+                "grid grid-cols-[auto_1fr_auto_auto_auto_auto] items-center gap-3 px-4 py-3",
+                i < lista.length - 1 && "border-b border-border",
+                !s.activa && "opacity-50"
+              )}>
+                <div className={cn("h-2 w-2 shrink-0 rounded-full", s.activa ? "bg-status-ok-mid" : "bg-text-tertiary")} />
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-text-primary">{s.nombre}</div>
+                  <div className="text-xs text-text-tertiary">{FORMATO_LABEL[s.formato] ?? s.formato}</div>
+                </div>
+                <span className="text-xs text-text-secondary">
+                  {s.zonaNombre ?? <span className="italic text-text-tertiary">Sin zona</span>}
+                </span>
+                {busy
+                  ? <Loader2 size={14} className="animate-spin text-text-tertiary" />
+                  : <Badge tone={s.activa ? "ok" : "gray"} size="sm">{s.activa ? "Activa" : "Inactiva"}</Badge>
+                }
+                <button disabled={busy} onClick={() => handleToggle(s.id, !s.activa)}
+                  className="rounded px-2 py-1 text-[11px] text-text-tertiary hover:bg-bg-secondary disabled:opacity-50">
+                  {s.activa ? "Desactivar" : "Activar"}
+                </button>
+                <div className="flex items-center gap-1">
+                  <button disabled={busy} onClick={() => setModalSuc(s)} title="Editar"
+                    className="rounded p-1 text-text-tertiary hover:bg-bg-secondary hover:text-brand-blue disabled:opacity-50">
+                    <Pencil size={13} />
+                  </button>
+                  <button disabled={busy} onClick={() => handleEliminar(s.id)} title="Eliminar"
+                    className="rounded p-1 text-text-tertiary hover:bg-status-danger-bg hover:text-status-danger disabled:opacity-50">
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {modalSuc !== null && (
+        <SucursalModal
+          sucursal={modalSuc === "nueva" ? null : modalSuc}
+          zonas={zonas}
+          onClose={() => setModalSuc(null)}
+          onSaved={(s) => {
+            setLista((prev) =>
+              modalSuc === "nueva"
+                ? [...prev, s]
+                : prev.map((x) => x.id === s.id ? s : x)
+            );
+            setModalSuc(null);
+          }}
+        />
+      )}
+    </>
   );
 }
 

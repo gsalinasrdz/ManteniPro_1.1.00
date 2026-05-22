@@ -13,7 +13,7 @@ export default async function ConfiguracionPage() {
     }),
     db.sucursal.findMany({
       where:   { empresaId },
-      select:  { id: true, nombre: true, formato: true, activa: true, zonaId: true, zona: { select: { nombre: true } } },
+      select:  { id: true, nombre: true, formato: true, direccion: true, activa: true, zonaId: true, zona: { select: { nombre: true } } },
       orderBy: { nombre: "asc" },
     }),
     db.usuario.findMany({
@@ -40,11 +40,12 @@ export default async function ConfiguracionPage() {
         concepto: empresa?.marca  ?? "",
       }}
       sucursales={sucursales.map((s) => ({
-        id:       s.id,
-        nombre:   s.nombre,
-        formato:  s.formato,
-        activa:   s.activa,
-        zonaId:   s.zonaId,
+        id:         s.id,
+        nombre:     s.nombre,
+        formato:    s.formato,
+        direccion:  s.direccion ?? undefined,
+        activa:     s.activa,
+        zonaId:     s.zonaId,
         zonaNombre: s.zona?.nombre ?? null,
       }))}
       usuarios={usuarios.map((u) => ({
