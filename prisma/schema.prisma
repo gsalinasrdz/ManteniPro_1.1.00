@@ -1,0 +1,303 @@
+// ════════════════════════════════════════════════════════════
+//  ManteniPro — Schema inicial
+//  Refleja las entidades del prototipo (mp-data.jsx)
+// ════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ── Multi-tenant base ────────────────────────────────────────
+model Empresa {
+  id        String     @id @default(cuid())
+  nombre    String
+  rfc       String     @unique
+  marca     String?
+  createdAt DateTime   @default(now())
+
+  sucursales Sucursal[]
+  usuarios   Usuario[]
+  refacciones Refaccion[]
+}
+
+model Sucursal {
+  id        String   @id @default(cuid())
+  empresaId String
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre    String
+  formato   FormatoSucursal @default(STANDARD)
+  direccion String?
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  equipos     Equipo[]
+  usuarios    Usuario[]
+  @@index([empresaId])
+}
+
+enum FormatoSucursal {
+  STANDARD
+  DRIVE_THRU
+  FOOD_COURT
+  DARK_KITCHEN
+  KIOSKO
+}
+
+// ── Auth (Auth.js compatible) ────────────────────────────────
+model Usuario {
+  id          String    @id @default(cuid())
+  empresaId   String
+  empresa     Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  email       String    @unique
+  emailVerified DateTime?
+  nombre      String
+  iniciales   String
+  imagen        String?
+  passwordHash  String?
+  rol           Rol       @default(TRABAJADOR)
+  sucursalId  String?
+  sucursal    Sucursal? @relation(fields: [sucursalId], references: [id])
+  activo      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  // Relaciones operativas
+  otsTecnico   OrdenTrabajo[] @relation("OTTecnico")
+  otsCreador   OrdenTrabajo[] @relation("OTCreador")
+  pmsAsignado  Preventivo[]   @relation("PMTecnico")
+  incidenciasReporta Incidencia[] @relation("IncReporta")
+  actividad    Actividad[]
+
+  @@index([empresaId])
+  @@index([sucursalId])
+}
+
+enum Rol {
+  GERENTE_OPERACIONES
+  GERENTE_SUCURSAL
+  TECNICO
+  TRABAJADOR
+}
+
+// ── Equipos ──────────────────────────────────────────────────
+model Equipo {
+  id          String   @id @default(cuid())
+  cu          String   @unique             // Código único: "CU-S0142"
+  sucursalId  String
+  sucursal    Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  tipo        String
+  area        String
+  marca       String
+  modelo      String
+  criticidad  Criticidad
+  estado      EstadoEquipo @default(OPERATIVO)
+  horas       Int      @default(0)
+  ultMant     DateTime?
+  proxMant    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ordenes     OrdenTrabajo[]
+  incidencias Incidencia[]
+  preventivos Preventivo[]
+
+  @@index([sucursalId])
+  @@index([estado])
+}
+
+enum Criticidad {
+  ALTA
+  MEDIA
+  BAJA
+}
+
+enum EstadoEquipo {
+  OPERATIVO
+  MANTENIMIENTO
+  FALLA
+  BAJA
+}
+
+// ── Órdenes de trabajo ───────────────────────────────────────
+model OrdenTrabajo {
+  id          String   @id @default(cuid())
+  numero      String   @unique             // "OT-2026-0312"
+  equipoId    String
+  equipo      Equipo   @relation(fields: [equipoId], references: [id])
+  titulo      String
+  descripcion String?
+  tipo        TipoOT
+  prioridad   Prioridad
+  estado      EstadoOT @default(PROGRAMADA)
+  tecnicoId   String?
+  tecnico     Usuario? @relation("OTTecnico", fields: [tecnicoId], references: [id])
+  creadorId   String
+  creador     Usuario  @relation("OTCreador", fields: [creadorId], references: [id])
+  programada  DateTime
+  iniciada    DateTime?
+  cerrada     DateTime?
+  costo       Decimal? @db.Decimal(10, 2)
+  evidencias  String[] // URLs de fotos
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  bitacora    Bitacora[]
+  refaccionesUsadas RefaccionUsada[]
+
+  @@index([equipoId])
+  @@index([tecnicoId])
+  @@index([estado])
+}
+
+enum TipoOT {
+  PREVENTIVO
+  CORRECTIVO
+  PREDICTIVO
+}
+
+enum Prioridad {
+  ALTA
+  MEDIA
+  BAJA
+}
+
+enum EstadoOT {
+  PROGRAMADA
+  ASIGNADA
+  EN_PROCESO
+  CERRADA
+  CANCELADA
+}
+
+// ── Incidencias ──────────────────────────────────────────────
+model Incidencia {
+  id          String   @id @default(cuid())
+  numero      String   @unique             // "INC-2026-0084"
+  equipoId    String
+  equipo      Equipo   @relation(fields: [equipoId], references: [id])
+  titulo      String
+  descripcion String?
+  severidad   Severidad
+  estado      EstadoIncidencia @default(EVALUACION)
+  reportaId   String
+  reporta     Usuario  @relation("IncReporta", fields: [reportaId], references: [id])
+  ordenId     String?               // OT generada desde esta incidencia
+  evidencias  String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([equipoId])
+  @@index([estado])
+}
+
+enum Severidad {
+  ALTA
+  MEDIA
+  BAJA
+}
+
+enum EstadoIncidencia {
+  EVALUACION
+  EN_ATENCION
+  CERRADA
+  DESCARTADA
+}
+
+// ── Preventivos ──────────────────────────────────────────────
+model Preventivo {
+  id          String   @id @default(cuid())
+  codigo      String   @unique             // "PM-001"
+  equipoId    String
+  equipo      Equipo   @relation(fields: [equipoId], references: [id])
+  tarea       String
+  frecuencia  Frecuencia
+  prox        DateTime
+  estado      EstadoPM @default(PROGRAMADO)
+  tecnicoId   String?
+  tecnico     Usuario? @relation("PMTecnico", fields: [tecnicoId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([equipoId])
+  @@index([estado])
+}
+
+enum Frecuencia {
+  SEMANAL
+  QUINCENAL
+  MENSUAL
+  BIMESTRAL
+  TRIMESTRAL
+  SEMESTRAL
+  ANUAL
+}
+
+enum EstadoPM {
+  PROGRAMADO
+  PROXIMO
+  VENCIDO
+  COMPLETADO
+}
+
+// ── Inventario ───────────────────────────────────────────────
+model Refaccion {
+  id          String   @id @default(cuid())
+  sku         String   @unique
+  empresaId   String
+  empresa     Empresa  @relation(fields: [empresaId], references: [id])
+  nombre      String
+  categoria   String
+  stock       Int      @default(0)
+  min         Int      @default(0)
+  max         Int      @default(0)
+  costo       Decimal  @db.Decimal(10, 2)
+  ubicacion   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  usos        RefaccionUsada[]
+
+  @@index([empresaId])
+}
+
+model RefaccionUsada {
+  id            String       @id @default(cuid())
+  ordenId       String
+  orden         OrdenTrabajo @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  refaccionId   String
+  refaccion     Refaccion    @relation(fields: [refaccionId], references: [id])
+  cantidad      Int
+  costoUnitario Decimal      @db.Decimal(10, 2)
+
+  @@index([ordenId])
+}
+
+// ── Bitácora / actividad ─────────────────────────────────────
+model Bitacora {
+  id        String   @id @default(cuid())
+  ordenId   String
+  orden     OrdenTrabajo @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  texto     String
+  autorId   String?
+  createdAt DateTime @default(now())
+
+  @@index([ordenId])
+}
+
+model Actividad {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     Usuario? @relation(fields: [actorId], references: [id])
+  accion    String   // "creó", "asignó", "cerró"
+  objeto    String   // "OT-2026-0312"
+  descripcion String?
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([createdAt])
+}
