@@ -3,7 +3,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useGlobalFilters } from "@/lib/stores/filters";
-import { SucChip } from "@/components/atoms/suc-chip";
+import { ZonaFilter } from "@/components/atoms/zona-filter";
+import type { ZonaOpt } from "@/components/atoms/zona-filter";
 import { Badge } from "@/components/atoms/badge";
 import { LocationBadge } from "@/components/atoms/location-badge";
 import { shortenSucursal } from "@/lib/utils";
@@ -21,6 +22,7 @@ export type { PreventivoConRelaciones };
 type SucursalResumen = {
   id: string;
   nombre: string;
+  zonaId: string | null;
   equiposConFalla: number;
 };
 
@@ -30,6 +32,7 @@ type TecnicoOption = { id: string; nombre: string; iniciales: string };
 interface PreventivoClientProps {
   preventivos: PreventivoConRelaciones[];
   sucursales:  SucursalResumen[];
+  zonas:       ZonaOpt[];
   equipos:     EquipoOption[];
   tecnicos:    TecnicoOption[];
   puedeFiltraSucursal: boolean;
@@ -68,12 +71,13 @@ function saludSucursal(equiposConFalla: number): "sano" | "atencion" | "critico"
 export function PreventivoClient({
   preventivos: initialPreventivos,
   sucursales,
+  zonas,
   equipos,
   tecnicos,
   puedeFiltraSucursal,
 }: PreventivoClientProps) {
   const router = useRouter();
-  const { sucursalId, setSucursalId } = useGlobalFilters();
+  const { zonaId, sucursalId, setSucursalId } = useGlobalFilters();
   const [busqueda, setBusqueda]         = useState("");
   const [soloUrgentes, setSoloUrgentes] = useState(false);
   const [preventivos, setPreventivos]   = useState<PreventivoConRelaciones[]>(initialPreventivos);
@@ -92,9 +96,15 @@ export function PreventivoClient({
     return map;
   }, [preventivos]);
 
+  const sucursalesEnZona = useMemo(() =>
+    zonaId ? new Set(sucursales.filter((s) => s.zonaId === zonaId).map((s) => s.id)) : null,
+  [zonaId, sucursales]);
+
   const filtrados = useMemo(() => {
     return preventivos.filter((pm) => {
-      if (sucursalId && pm.equipo.sucursal.id !== sucursalId) return false;
+      const sid = pm.equipo.sucursal.id;
+      if (sucursalesEnZona && !sucursalesEnZona.has(sid)) return false;
+      if (sucursalId && sid !== sucursalId) return false;
       if (soloUrgentes && pm.estado !== "VENCIDO" && pm.estado !== "PROXIMO") return false;
       if (busqueda) {
         const q = busqueda.toLowerCase();
@@ -146,24 +156,8 @@ export function PreventivoClient({
   return (
     <>
       <div className="flex flex-col gap-4">
-        {/* Selector de sucursal */}
-        {puedeFiltraSucursal && (
-          <div className="flex flex-wrap items-center gap-2">
-            <SucChip active={sucursalId === null} onClick={() => setSucursalId(null)}>
-              Todas las sucursales
-            </SucChip>
-            {sucursales.map((s) => (
-              <SucChip
-                key={s.id}
-                active={sucursalId === s.id}
-                onClick={() => setSucursalId(sucursalId === s.id ? null : s.id)}
-                salud={saludSucursal(s.equiposConFalla)}
-              >
-                {shortenSucursal(s.nombre)}
-              </SucChip>
-            ))}
-          </div>
-        )}
+        {/* Selector de zona y sucursal */}
+        <ZonaFilter zonas={zonas} sucursales={sucursales} puedeFiltraSucursal={puedeFiltraSucursal} />
 
         {/* Desglose por sucursal */}
         {sucursalId === null && puedeFiltraSucursal && (

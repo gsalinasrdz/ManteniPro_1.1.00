@@ -10,6 +10,7 @@ import { shortenSucursal } from "@/lib/utils";
 import { Badge } from "@/components/atoms/badge";
 import { toast } from "sonner";
 import { cambiarRolUsuario, toggleActivoUsuario, invitarUsuario, editarUsuario, eliminarUsuario, cambiarPassword } from "@/lib/actions/usuario";
+import { asignarZonaSucursal } from "@/lib/actions/sucursal";
 import { useSession } from "next-auth/react";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -17,11 +18,15 @@ import { useSession } from "next-auth/react";
 type EmpresaData = { nombre: string; rfc: string; concepto: string };
 
 type SucursalData = {
-  id:      string;
-  nombre:  string;
-  formato: string;
-  activa:  boolean;
+  id:         string;
+  nombre:     string;
+  formato:    string;
+  activa:     boolean;
+  zonaId:     string | null;
+  zonaNombre: string | null;
 };
+
+type ZonaData = { id: string; nombre: string };
 
 type UsuarioData = {
   id:        string;
@@ -40,6 +45,7 @@ interface ConfiguracionClientProps {
   sucursales:    SucursalData[];
   usuarios:      UsuarioData[];
   sucursalesOpts: SucursalOpt[];
+  zonas:         ZonaData[];
 }
 
 // ── Visual helpers ─────────────────────────────────────────────
@@ -136,14 +142,29 @@ function TabEmpresa({ empresa, total }: { empresa: EmpresaData; total: number })
 
 // ── Tab: Sucursales ────────────────────────────────────────────
 
-function TabSucursales({ sucursales }: { sucursales: SucursalData[] }) {
-  const activas   = sucursales.filter((s) => s.activa).length;
-  const inactivas = sucursales.filter((s) => !s.activa).length;
+function TabSucursales({ sucursales, zonas }: { sucursales: SucursalData[]; zonas: ZonaData[] }) {
+  const [lista, setLista] = useState<SucursalData[]>(sucursales);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const activas   = lista.filter((s) => s.activa).length;
+  const inactivas = lista.filter((s) => !s.activa).length;
+
+  async function handleZona(sucId: string, zonaId: string) {
+    setLoadingId(sucId);
+    const result = await asignarZonaSucursal(sucId, zonaId || null);
+    setLoadingId(null);
+    if (!result.ok) { toast.error("Error", { description: result.error }); return; }
+    const zona = zonas.find((z) => z.id === zonaId) ?? null;
+    setLista((prev) => prev.map((s) => s.id === sucId
+      ? { ...s, zonaId: zona?.id ?? null, zonaNombre: zona?.nombre ?? null }
+      : s
+    ));
+    toast.success("Zona actualizada");
+  }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-3">
-        {[["Activas", activas], ["Inactivas", inactivas], ["Total", sucursales.length]].map(([l, v]) => (
+        {[["Activas", activas], ["Inactivas", inactivas], ["Total", lista.length]].map(([l, v]) => (
           <div key={String(l)} className="flex-1 rounded-xl border border-border bg-bg-primary p-4">
             <div className="text-xs text-text-tertiary">{l}</div>
             <div className="mt-1 text-2xl font-bold text-text-primary">{v}</div>
@@ -152,21 +173,34 @@ function TabSucursales({ sucursales }: { sucursales: SucursalData[] }) {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-bg-primary">
-        {sucursales.map((s, i) => (
-          <div key={s.id} className={cn("flex items-center gap-3 px-4 py-3", i < sucursales.length - 1 && "border-b border-border")}>
-            <div className={cn("h-2 w-2 shrink-0 rounded-full", s.activa ? "bg-status-ok-mid" : "bg-text-tertiary")} />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium text-text-primary">{s.nombre}</div>
-              <div className="text-xs text-text-tertiary">{FORMATO_LABEL[s.formato] ?? s.formato}</div>
+        <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3 border-b border-border bg-bg-secondary px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+          <span></span><span>Sucursal</span><span>Zona</span><span>Estado</span>
+        </div>
+        {lista.map((s, i) => {
+          const busy = loadingId === s.id;
+          return (
+            <div key={s.id} className={cn("grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 px-4 py-3", i < lista.length - 1 && "border-b border-border")}>
+              <div className={cn("h-2 w-2 shrink-0 rounded-full", s.activa ? "bg-status-ok-mid" : "bg-text-tertiary")} />
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium text-text-primary">{s.nombre}</div>
+                <div className="text-xs text-text-tertiary">{FORMATO_LABEL[s.formato] ?? s.formato}</div>
+              </div>
+              <select
+                value={s.zonaId ?? ""}
+                disabled={busy}
+                onChange={(e) => handleZona(s.id, e.target.value)}
+                className="h-7 rounded-md border border-border bg-bg-secondary px-2 text-[11px] text-text-primary focus:border-brand-blue focus:outline-none disabled:opacity-50"
+              >
+                <option value="">Sin zona</option>
+                {zonas.map((z) => <option key={z.id} value={z.id}>{z.nombre}</option>)}
+              </select>
+              {busy
+                ? <Loader2 size={14} className="animate-spin text-text-tertiary" />
+                : <Badge tone={s.activa ? "ok" : "gray"} size="sm">{s.activa ? "Activa" : "Inactiva"}</Badge>
+              }
             </div>
-            <Badge tone={s.activa ? "ok" : "gray"} size="sm">{s.activa ? "Activa" : "Inactiva"}</Badge>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-bg-secondary px-3 py-2">
-        <Pendiente />
-        <span className="text-xs text-text-tertiary">La edición de sucursales estará disponible en la siguiente versión.</span>
+          );
+        })}
       </div>
     </div>
   );
@@ -759,6 +793,7 @@ export function ConfiguracionClient({
   sucursales,
   usuarios,
   sucursalesOpts,
+  zonas,
 }: ConfiguracionClientProps) {
   const [activeTab, setActiveTab] = useState<TabId>("empresa");
 
@@ -789,7 +824,7 @@ export function ConfiguracionClient({
 
       <div>
         {activeTab === "empresa"        && <TabEmpresa empresa={empresa} total={usuarios.length} />}
-        {activeTab === "sucursales"     && <TabSucursales sucursales={sucursales} />}
+        {activeTab === "sucursales"     && <TabSucursales sucursales={sucursales} zonas={zonas} />}
         {activeTab === "usuarios"       && <TabUsuarios initialUsuarios={usuarios} sucursalesOpts={sucursalesOpts} />}
         {activeTab === "parametros"     && <TabParametros />}
         {activeTab === "notificaciones" && <TabNotificaciones />}

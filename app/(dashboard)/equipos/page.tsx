@@ -12,7 +12,7 @@ export default async function EquiposPage() {
       ? { sucursalId: userSucId }
       : { sucursal: { empresaId } };
 
-  const [equipos, sucursales] = await Promise.all([
+  const [equipos, sucursales, zonas] = await Promise.all([
     db.equipo.findMany({
       where: equipoWhere,
       include: {
@@ -23,8 +23,7 @@ export default async function EquiposPage() {
     db.sucursal.findMany({
       where: { empresaId, activa: true },
       select: {
-        id: true,
-        nombre: true,
+        id: true, nombre: true, zonaId: true,
         _count: {
           select: {
             equipos: { where: { estado: { in: [EstadoEquipo.FALLA, EstadoEquipo.MANTENIMIENTO] } } },
@@ -33,12 +32,18 @@ export default async function EquiposPage() {
       },
       orderBy: { nombre: "asc" },
     }),
+    db.zona.findMany({
+      where:   { empresaId },
+      select:  { id: true, nombre: true },
+      orderBy: { nombre: "asc" },
+    }),
   ]);
 
   return (
     <EquiposClient
       equipos={equipos}
-      sucursales={sucursales.map((s) => ({ id: s.id, nombre: s.nombre, equiposConFalla: s._count.equipos }))}
+      sucursales={sucursales.map((s) => ({ id: s.id, nombre: s.nombre, zonaId: s.zonaId, equiposConFalla: s._count.equipos }))}
+      zonas={zonas}
       puedeFiltraSucursal={rol !== "GERENTE_SUCURSAL"}
     />
   );

@@ -3,7 +3,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useGlobalFilters } from "@/lib/stores/filters";
-import { SucChip } from "@/components/atoms/suc-chip";
+import { ZonaFilter } from "@/components/atoms/zona-filter";
+import type { ZonaOpt } from "@/components/atoms/zona-filter";
 import { Badge } from "@/components/atoms/badge";
 import { LocationBadge } from "@/components/atoms/location-badge";
 import { shortenSucursal } from "@/lib/utils";
@@ -22,6 +23,7 @@ export type { OrdenConRelaciones };
 type SucursalResumen = {
   id: string;
   nombre: string;
+  zonaId: string | null;
   equiposConFalla: number;
 };
 
@@ -31,6 +33,7 @@ type TecnicoOption = { id: string; nombre: string; iniciales: string };
 interface OrdenesClientProps {
   ordenes: OrdenConRelaciones[];
   sucursales: SucursalResumen[];
+  zonas: ZonaOpt[];
   puedeFiltraSucursal: boolean;
   equiposPorSucursal: Record<string, EquipoOption[]>;
   tecnicos: TecnicoOption[];
@@ -68,12 +71,13 @@ function saludSucursal(n: number): "sano" | "atencion" | "critico" {
 export function OrdenesClient({
   ordenes: initialOrdenes,
   sucursales,
+  zonas,
   puedeFiltraSucursal,
   equiposPorSucursal,
   tecnicos,
 }: OrdenesClientProps) {
   const router = useRouter();
-  const { sucursalId, setSucursalId } = useGlobalFilters();
+  const { zonaId, sucursalId, setSucursalId } = useGlobalFilters();
   const [busqueda, setBusqueda]         = useState("");
   const [soloActivas, setSoloActivas]   = useState(false);
   const [ordenes, setOrdenes]           = useState<OrdenConRelaciones[]>(initialOrdenes);
@@ -92,9 +96,15 @@ export function OrdenesClient({
     return map;
   }, [ordenes]);
 
+  const sucursalesEnZona = useMemo(() =>
+    zonaId ? new Set(sucursales.filter((s) => s.zonaId === zonaId).map((s) => s.id)) : null,
+  [zonaId, sucursales]);
+
   const filtradas = useMemo(() => {
     return ordenes.filter((ot) => {
-      if (sucursalId && ot.equipo.sucursal.id !== sucursalId) return false;
+      const sid = ot.equipo.sucursal.id;
+      if (sucursalesEnZona && !sucursalesEnZona.has(sid)) return false;
+      if (sucursalId && sid !== sucursalId) return false;
       if (soloActivas && (ot.estado === "CERRADA" || ot.estado === "CANCELADA")) return false;
       if (busqueda) {
         const q = busqueda.toLowerCase();
@@ -186,24 +196,8 @@ export function OrdenesClient({
   return (
     <>
       <div className="flex flex-col gap-4">
-        {/* Selector de sucursal */}
-        {puedeFiltraSucursal && (
-          <div className="flex flex-wrap items-center gap-2">
-            <SucChip active={sucursalId === null} onClick={() => setSucursalId(null)}>
-              Todas las sucursales
-            </SucChip>
-            {sucursales.map((s) => (
-              <SucChip
-                key={s.id}
-                active={sucursalId === s.id}
-                onClick={() => setSucursalId(sucursalId === s.id ? null : s.id)}
-                salud={saludSucursal(s.equiposConFalla)}
-              >
-                {shortenSucursal(s.nombre)}
-              </SucChip>
-            ))}
-          </div>
-        )}
+        {/* Selector de zona y sucursal */}
+        <ZonaFilter zonas={zonas} sucursales={sucursales} puedeFiltraSucursal={puedeFiltraSucursal} />
 
         {/* Desglose por sucursal */}
         {sucursalId === null && puedeFiltraSucursal && (

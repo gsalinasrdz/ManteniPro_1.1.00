@@ -6,14 +6,14 @@ export default async function ConfiguracionPage() {
   const session    = await auth();
   const { empresaId } = session!.user;
 
-  const [empresa, sucursales, usuarios] = await Promise.all([
+  const [empresa, sucursales, usuarios, zonas] = await Promise.all([
     db.empresa.findUnique({
       where:  { id: empresaId },
       select: { nombre: true, rfc: true, marca: true },
     }),
     db.sucursal.findMany({
       where:   { empresaId },
-      select:  { id: true, nombre: true, formato: true, activa: true },
+      select:  { id: true, nombre: true, formato: true, activa: true, zonaId: true, zona: { select: { nombre: true } } },
       orderBy: { nombre: "asc" },
     }),
     db.usuario.findMany({
@@ -25,6 +25,11 @@ export default async function ConfiguracionPage() {
       },
       orderBy: { nombre: "asc" },
     }),
+    db.zona.findMany({
+      where:   { empresaId },
+      select:  { id: true, nombre: true },
+      orderBy: { nombre: "asc" },
+    }),
   ]);
 
   return (
@@ -34,7 +39,14 @@ export default async function ConfiguracionPage() {
         rfc:      empresa?.rfc    ?? "",
         concepto: empresa?.marca  ?? "",
       }}
-      sucursales={sucursales}
+      sucursales={sucursales.map((s) => ({
+        id:       s.id,
+        nombre:   s.nombre,
+        formato:  s.formato,
+        activa:   s.activa,
+        zonaId:   s.zonaId,
+        zonaNombre: s.zona?.nombre ?? null,
+      }))}
       usuarios={usuarios.map((u) => ({
         id:         u.id,
         nombre:     u.nombre,
@@ -47,6 +59,7 @@ export default async function ConfiguracionPage() {
       sucursalesOpts={sucursales
         .filter((s) => s.activa)
         .map((s) => ({ id: s.id, nombre: s.nombre }))}
+      zonas={zonas}
     />
   );
 }

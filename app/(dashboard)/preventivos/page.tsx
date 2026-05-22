@@ -12,7 +12,7 @@ export default async function PreventivosPage() {
       ? { sucursalId: userSucId }
       : { sucursal: { empresaId } };
 
-  const [preventivos, sucursales, equiposTodos, tecnicos] = await Promise.all([
+  const [preventivos, sucursales, equiposTodos, tecnicos, zonas] = await Promise.all([
     db.preventivo.findMany({
       where: { equipo: equipoWhere },
       include: {
@@ -26,8 +26,7 @@ export default async function PreventivosPage() {
     db.sucursal.findMany({
       where: { empresaId, activa: true },
       select: {
-        id: true,
-        nombre: true,
+        id: true, nombre: true, zonaId: true,
         _count: {
           select: {
             equipos: { where: { estado: { in: [EstadoEquipo.FALLA, EstadoEquipo.MANTENIMIENTO] } } },
@@ -46,12 +45,18 @@ export default async function PreventivosPage() {
       select:  { id: true, nombre: true, iniciales: true },
       orderBy: { nombre: "asc" },
     }),
+    db.zona.findMany({
+      where:   { empresaId },
+      select:  { id: true, nombre: true },
+      orderBy: { nombre: "asc" },
+    }),
   ]);
 
   return (
     <PreventivoClient
       preventivos={preventivos}
-      sucursales={sucursales.map((s) => ({ id: s.id, nombre: s.nombre, equiposConFalla: s._count.equipos }))}
+      sucursales={sucursales.map((s) => ({ id: s.id, nombre: s.nombre, zonaId: s.zonaId, equiposConFalla: s._count.equipos }))}
+      zonas={zonas}
       equipos={equiposTodos.map((e) => ({ id: e.id, cu: e.cu, tipo: e.tipo, sucursalId: e.sucursalId, sucursalNombre: e.sucursal.nombre }))}
       tecnicos={tecnicos}
       puedeFiltraSucursal={rol !== "GERENTE_SUCURSAL"}

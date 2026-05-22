@@ -29,6 +29,7 @@ async function main() {
   await db.actividad.deleteMany();
   await db.usuario.deleteMany();
   await db.sucursal.deleteMany();
+  await db.zona.deleteMany();
   await db.empresa.deleteMany();
 
   // ── Empresa ────────────────────────────────────────────────
@@ -36,18 +37,27 @@ async function main() {
     data: { nombre: "Sabor Express", rfc: "SBE220815JK9", marca: "Cadena de pizzas y hamburguesas" },
   });
 
+  // ── Zonas ──────────────────────────────────────────────────
+  const [zonaCarbonifera, zonaCentro, zonaSaltillo] = await Promise.all([
+    db.zona.create({ data: { empresaId: empresa.id, nombre: "Zona Carbonifera" } }),
+    db.zona.create({ data: { empresaId: empresa.id, nombre: "Zona Centro"      } }),
+    db.zona.create({ data: { empresaId: empresa.id, nombre: "Zona Saltillo"    } }),
+  ]);
+
   // ── Sucursales ─────────────────────────────────────────────
-  const sucNombres = [
-    "Sabor Express Insurgentes",
-    "Sabor Express Polanco",
-    "Sabor Express Santa Fe",
-    "Sabor Express Coyoacán",
-    "Sabor Express Tlalpan",
-    "Sabor Express Pedregal",
-    "Sabor Express Xochimilco",
+  const sucData = [
+    { nombre: "Sabor Express Insurgentes", zonaId: zonaCarbonifera.id },
+    { nombre: "Sabor Express Polanco",     zonaId: zonaCarbonifera.id },
+    { nombre: "Sabor Express Santa Fe",    zonaId: zonaCentro.id      },
+    { nombre: "Sabor Express Coyoacán",    zonaId: zonaCentro.id      },
+    { nombre: "Sabor Express Tlalpan",     zonaId: zonaCentro.id      },
+    { nombre: "Sabor Express Pedregal",    zonaId: zonaSaltillo.id    },
+    { nombre: "Sabor Express Xochimilco",  zonaId: zonaSaltillo.id    },
   ];
   const sucursales = await Promise.all(
-    sucNombres.map((nombre) => db.sucursal.create({ data: { empresaId: empresa.id, nombre } }))
+    sucData.map(({ nombre, zonaId }) =>
+      db.sucursal.create({ data: { empresaId: empresa.id, nombre, zonaId } })
+    )
   );
   const suc = Object.fromEntries(sucursales.map((s) => [s.nombre, s]));
 

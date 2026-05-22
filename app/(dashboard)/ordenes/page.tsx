@@ -17,7 +17,7 @@ export default async function OrdenesPage() {
       ? { tecnicoId: session!.user.id }
       : { equipo: equipoWhere };
 
-  const [ordenes, sucursales, equiposTodos, tecnicos] = await Promise.all([
+  const [ordenes, sucursales, equiposTodos, tecnicos, zonas] = await Promise.all([
     db.ordenTrabajo.findMany({
       where: otWhere,
       include: {
@@ -31,8 +31,7 @@ export default async function OrdenesPage() {
     db.sucursal.findMany({
       where: { empresaId, activa: true },
       select: {
-        id: true,
-        nombre: true,
+        id: true, nombre: true, zonaId: true,
         _count: {
           select: {
             equipos: { where: { estado: { in: [EstadoEquipo.FALLA, EstadoEquipo.MANTENIMIENTO] } } },
@@ -51,21 +50,24 @@ export default async function OrdenesPage() {
       select:  { id: true, nombre: true, iniciales: true },
       orderBy: { nombre: "asc" },
     }),
+    db.zona.findMany({
+      where:   { empresaId },
+      select:  { id: true, nombre: true },
+      orderBy: { nombre: "asc" },
+    }),
   ]);
 
-  // Group equipos by sucursalId for the modal picker
   const equiposPorSucursal: Record<string, { id: string; cu: string; tipo: string; area: string }[]> = {};
   for (const eq of equiposTodos) {
     if (!equiposPorSucursal[eq.sucursalId]) equiposPorSucursal[eq.sucursalId] = [];
-    equiposPorSucursal[eq.sucursalId]!.push({
-      id: eq.id, cu: eq.cu, tipo: eq.tipo, area: eq.area,
-    });
+    equiposPorSucursal[eq.sucursalId]!.push({ id: eq.id, cu: eq.cu, tipo: eq.tipo, area: eq.area });
   }
 
   return (
     <OrdenesClient
       ordenes={ordenes}
-      sucursales={sucursales.map((s) => ({ id: s.id, nombre: s.nombre, equiposConFalla: s._count.equipos }))}
+      sucursales={sucursales.map((s) => ({ id: s.id, nombre: s.nombre, zonaId: s.zonaId, equiposConFalla: s._count.equipos }))}
+      zonas={zonas}
       puedeFiltraSucursal={rol !== "GERENTE_SUCURSAL"}
       equiposPorSucursal={equiposPorSucursal}
       tecnicos={tecnicos}
