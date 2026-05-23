@@ -35,6 +35,7 @@ const config: Config = {
         "status-ok": {
           DEFAULT: "#3B6D11",
           bg: "#EAF3DE",
+          mid: "#5D9E1F",
         },
         "status-warn": {
           DEFAULT: "#854F0B",
