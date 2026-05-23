@@ -2,7 +2,6 @@
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { FormatoSucursal } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
@@ -29,10 +28,12 @@ export async function asignarZonaSucursal(
 }
 
 export async function crearSucursal(input: {
-  nombre:   string;
-  formato:  string;
-  direccion?: string;
-  zonaId:   string | null;
+  nombre:      string;
+  zonaId:      string | null;
+  ciudad?:     string;
+  direccion?:  string;
+  responsable?: string;
+  telefono?:   string;
 }): Promise<ActionResult & { id?: string }> {
   const session = await auth();
   if (!session) return { ok: false, error: "No autenticado" };
@@ -50,11 +51,13 @@ export async function crearSucursal(input: {
     const suc = await db.sucursal.create({
       data: {
         empresaId,
-        nombre:   input.nombre.trim(),
-        formato:  input.formato as FormatoSucursal,
-        direccion: input.direccion?.trim() || null,
-        zonaId:   input.zonaId || null,
-        activa:   true,
+        nombre:      input.nombre.trim(),
+        zonaId:      input.zonaId || null,
+        ciudad:      input.ciudad?.trim()      || null,
+        direccion:   input.direccion?.trim()   || null,
+        responsable: input.responsable?.trim() || null,
+        telefono:    input.telefono?.trim()    || null,
+        activa:      true,
       },
     });
     revalidatePath("/configuracion");
@@ -65,11 +68,13 @@ export async function crearSucursal(input: {
 }
 
 export async function editarSucursal(input: {
-  sucursalId: string;
-  nombre:     string;
-  formato:    string;
-  direccion?: string;
-  zonaId:     string | null;
+  sucursalId:   string;
+  nombre:       string;
+  zonaId:       string | null;
+  ciudad?:      string;
+  direccion?:   string;
+  responsable?: string;
+  telefono?:    string;
 }): Promise<ActionResult> {
   const session = await auth();
   if (!session) return { ok: false, error: "No autenticado" };
@@ -89,10 +94,12 @@ export async function editarSucursal(input: {
     await db.sucursal.update({
       where: { id: input.sucursalId },
       data: {
-        nombre:    input.nombre.trim(),
-        formato:   input.formato as FormatoSucursal,
-        direccion: input.direccion?.trim() || null,
-        zonaId:    input.zonaId || null,
+        nombre:      input.nombre.trim(),
+        zonaId:      input.zonaId || null,
+        ciudad:      input.ciudad?.trim()      || null,
+        direccion:   input.direccion?.trim()   || null,
+        responsable: input.responsable?.trim() || null,
+        telefono:    input.telefono?.trim()    || null,
       },
     });
     revalidatePath("/configuracion");

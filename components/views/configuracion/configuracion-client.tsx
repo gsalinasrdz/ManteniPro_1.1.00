@@ -19,13 +19,15 @@ import { useSession } from "next-auth/react";
 type EmpresaData = { nombre: string; rfc: string; concepto: string };
 
 type SucursalData = {
-  id:         string;
-  nombre:     string;
-  formato:    string;
-  direccion?: string;
-  activa:     boolean;
-  zonaId:     string | null;
-  zonaNombre: string | null;
+  id:          string;
+  nombre:      string;
+  ciudad?:     string;
+  direccion?:  string;
+  responsable?: string;
+  telefono?:   string;
+  activa:      boolean;
+  zonaId:      string | null;
+  zonaNombre:  string | null;
 };
 
 type ZonaData = { id: string; nombre: string; sucursalesCount: number };
@@ -64,14 +66,6 @@ const ROL_TONE: Record<string, "info" | "warn" | "ok" | "gray"> = {
   TECNICO:             "ok",
   TRABAJADOR:            "gray",
 };
-const FORMATO_LABEL: Record<string, string> = {
-  STANDARD:     "Estándar",
-  DARK_KITCHEN: "Dark Kitchen",
-  FOOD_COURT:   "Food Court",
-  DRIVE_THRU:   "Drive Thru",
-  KIOSKO:       "Kiosko",
-};
-const FORMATOS = ["STANDARD", "DRIVE_THRU", "FOOD_COURT", "DARK_KITCHEN", "KIOSKO"] as const;
 
 const ROLES = ["GERENTE_OPERACIONES", "GERENTE_SUCURSAL", "TECNICO", "TRABAJADOR"] as const;
 
@@ -158,41 +152,55 @@ function SucursalModal({
   onSaved:   (s: SucursalData) => void;
 }) {
   const esEdicion = !!sucursal;
-  const [nombre,    setNombre]    = useState(sucursal?.nombre    ?? "");
-  const [formato,   setFormato]   = useState(sucursal?.formato   ?? "STANDARD");
-  const [direccion, setDireccion] = useState(sucursal?.direccion ?? "");
-  const [zonaId,    setZonaId]    = useState(sucursal?.zonaId    ?? "");
-  const [loading,   setLoading]   = useState(false);
+  const [nombre,      setNombre]      = useState(sucursal?.nombre      ?? "");
+  const [zonaId,      setZonaId]      = useState(sucursal?.zonaId      ?? "");
+  const [ciudad,      setCiudad]      = useState(sucursal?.ciudad      ?? "");
+  const [direccion,   setDireccion]   = useState(sucursal?.direccion   ?? "");
+  const [responsable, setResponsable] = useState(sucursal?.responsable ?? "");
+  const [telefono,    setTelefono]    = useState(sucursal?.telefono    ?? "");
+  const [loading,     setLoading]     = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    const zona = zonas.find((z) => z.id === zonaId) ?? null;
+    const campos = { nombre, zonaId: zonaId || null, ciudad, direccion, responsable, telefono };
 
     if (esEdicion) {
-      const result = await editarSucursal({
-        sucursalId: sucursal!.id,
-        nombre, formato, direccion,
-        zonaId: zonaId || null,
-      });
+      const result = await editarSucursal({ sucursalId: sucursal!.id, ...campos });
       setLoading(false);
       if (!result.ok) { toast.error("Error", { description: result.error }); return; }
-      const zona = zonas.find((z) => z.id === zonaId) ?? null;
-      onSaved({ ...sucursal!, nombre: nombre.trim(), formato, zonaId: zona?.id ?? null, zonaNombre: zona?.nombre ?? null });
+      onSaved({ ...sucursal!, nombre: nombre.trim(), ciudad, direccion, responsable, telefono, zonaId: zona?.id ?? null, zonaNombre: zona?.nombre ?? null });
       toast.success("Sucursal actualizada");
     } else {
-      const result = await crearSucursal({ nombre, formato, direccion, zonaId: zonaId || null });
+      const result = await crearSucursal(campos);
       setLoading(false);
       if (!result.ok) { toast.error("Error", { description: result.error }); return; }
-      const zona = zonas.find((z) => z.id === zonaId) ?? null;
       onSaved({
         id: (result as { ok: true; id?: string }).id ?? crypto.randomUUID(),
-        nombre: nombre.trim(), formato, activa: true,
-        zonaId: zona?.id ?? null, zonaNombre: zona?.nombre ?? null,
+        nombre: nombre.trim(), ciudad, direccion, responsable, telefono,
+        activa: true, zonaId: zona?.id ?? null, zonaNombre: zona?.nombre ?? null,
       });
       toast.success("Sucursal creada");
     }
     onClose();
   }
+
+  const field = (label: string, value: string, onChange: (v: string) => void, opts?: { required?: boolean; placeholder?: string; type?: string }) => (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs font-medium text-text-secondary">
+        {label}{!opts?.required && <span className="ml-1 text-text-tertiary">(opcional)</span>}
+      </label>
+      <input
+        required={opts?.required}
+        type={opts?.type ?? "text"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={opts?.placeholder}
+        className="h-9 rounded-lg border border-border bg-bg-primary px-3 text-sm text-text-primary placeholder:text-text-tertiary focus:border-brand-blue focus:outline-none"
+      />
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -202,33 +210,23 @@ function SucursalModal({
           {esEdicion ? "Editar sucursal" : "Nueva sucursal"}
         </h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+
+          {field("Nombre", nombre, setNombre, { required: true, placeholder: "Ej. Sabor Express Saltillo Centro" })}
+
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">Nombre</label>
-            <input required value={nombre} onChange={(e) => setNombre(e.target.value)}
-              placeholder="Ej. Zona Carbonifera — Sabinas"
-              className="h-9 rounded-lg border border-border bg-bg-primary px-3 text-sm text-text-primary placeholder:text-text-tertiary focus:border-brand-blue focus:outline-none" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">Formato</label>
-            <select value={formato} onChange={(e) => setFormato(e.target.value)}
-              className="h-9 rounded-lg border border-border bg-bg-primary px-3 text-sm text-text-primary focus:border-brand-blue focus:outline-none">
-              {FORMATOS.map((f) => <option key={f} value={f}>{FORMATO_LABEL[f]}</option>)}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">Zona</label>
+            <label className="text-xs font-medium text-text-secondary">Zona<span className="ml-1 text-text-tertiary">(opcional)</span></label>
             <select value={zonaId} onChange={(e) => setZonaId(e.target.value)}
               className="h-9 rounded-lg border border-border bg-bg-primary px-3 text-sm text-text-primary focus:border-brand-blue focus:outline-none">
               <option value="">Sin zona</option>
               {zonas.map((z) => <option key={z.id} value={z.id}>{z.nombre}</option>)}
             </select>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">Dirección <span className="text-text-tertiary">(opcional)</span></label>
-            <input value={direccion} onChange={(e) => setDireccion(e.target.value)}
-              placeholder="Calle, número, colonia"
-              className="h-9 rounded-lg border border-border bg-bg-primary px-3 text-sm text-text-primary placeholder:text-text-tertiary focus:border-brand-blue focus:outline-none" />
-          </div>
+
+          {field("Ciudad", ciudad, setCiudad, { placeholder: "Ej. Saltillo" })}
+          {field("Dirección", direccion, setDireccion, { placeholder: "Calle, número, colonia" })}
+          {field("Responsable", responsable, setResponsable, { placeholder: "Nombre del encargado" })}
+          {field("Teléfono", telefono, setTelefono, { placeholder: "Ej. 844 123 4567", type: "tel" })}
+
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={onClose}
               className="h-9 rounded-lg border border-border px-4 text-sm text-text-secondary hover:bg-bg-secondary">
@@ -314,7 +312,7 @@ function TabSucursales({ sucursales: initialSucursales, zonas }: { sucursales: S
                 <div className={cn("h-2 w-2 shrink-0 rounded-full", s.activa ? "bg-status-ok-mid" : "bg-text-tertiary")} />
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-text-primary">{s.nombre}</div>
-                  <div className="text-xs text-text-tertiary">{FORMATO_LABEL[s.formato] ?? s.formato}</div>
+                  {s.ciudad && <div className="truncate text-xs text-text-tertiary">{s.ciudad}</div>}
                 </div>
                 <span className="text-xs text-text-secondary">
                   {s.zonaNombre ?? <span className="italic text-text-tertiary">Sin zona</span>}

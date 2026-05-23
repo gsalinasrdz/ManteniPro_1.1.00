@@ -40,30 +40,24 @@ model Zona {
 }
 
 model Sucursal {
-  id        String   @id @default(cuid())
-  empresaId String
-  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  zonaId    String?
-  zona      Zona?    @relation(fields: [zonaId], references: [id])
-  nombre    String
-  formato   FormatoSucursal @default(STANDARD)
-  direccion String?
-  activa    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  empresaId   String
+  empresa     Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  zonaId      String?
+  zona        Zona?    @relation(fields: [zonaId], references: [id])
+  nombre      String
+  ciudad      String?
+  direccion   String?
+  responsable String?
+  telefono    String?
+  activa      Boolean  @default(true)
+  createdAt   DateTime @default(now())
 
   equipos     Equipo[]
   usuarios    Usuario[]
 
   @@index([empresaId])
   @@index([zonaId])
-}
-
-enum FormatoSucursal {
-  STANDARD
-  DRIVE_THRU
-  FOOD_COURT
-  DARK_KITCHEN
-  KIOSKO
 }
 
 // ── Auth (Auth.js compatible) ────────────────────────────────
