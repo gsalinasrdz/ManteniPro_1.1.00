@@ -27,7 +27,7 @@ export default async function ConfiguracionPage() {
     }),
     db.zona.findMany({
       where:   { empresaId },
-      select:  { id: true, nombre: true },
+      select:  { id: true, nombre: true, _count: { select: { sucursales: true } } },
       orderBy: { nombre: "asc" },
     }),
   ]);
@@ -60,7 +60,7 @@ export default async function ConfiguracionPage() {
       sucursalesOpts={sucursales
         .filter((s) => s.activa)
         .map((s) => ({ id: s.id, nombre: s.nombre }))}
-      zonas={zonas}
+      zonas={zonas.map((z) => ({ id: z.id, nombre: z.nombre, sucursalesCount: z._count.sucursales }))}
     />
   );
 }

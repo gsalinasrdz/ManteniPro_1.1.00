@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   Building2, MapPin, Users, Settings2, Bell,
-  CheckCircle2, XCircle, ChevronRight, Plus, Loader2, KeyRound, Pencil, Trash2,
+  CheckCircle2, XCircle, ChevronRight, Plus, Loader2, KeyRound, Pencil, Trash2, Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { shortenSucursal } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/atoms/badge";
 import { toast } from "sonner";
 import { cambiarRolUsuario, toggleActivoUsuario, invitarUsuario, editarUsuario, eliminarUsuario, cambiarPassword } from "@/lib/actions/usuario";
 import { asignarZonaSucursal, crearSucursal, editarSucursal, toggleActivaSucursal, eliminarSucursal } from "@/lib/actions/sucursal";
+import { crearZona, editarZona, eliminarZona } from "@/lib/actions/zona";
 import { useSession } from "next-auth/react";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -27,7 +28,7 @@ type SucursalData = {
   zonaNombre: string | null;
 };
 
-type ZonaData = { id: string; nombre: string };
+type ZonaData = { id: string; nombre: string; sucursalesCount: number };
 
 type UsuarioData = {
   id:        string;
@@ -74,11 +75,12 @@ const FORMATOS = ["STANDARD", "DRIVE_THRU", "FOOD_COURT", "DARK_KITCHEN", "KIOSK
 
 const ROLES = ["GERENTE_OPERACIONES", "GERENTE_SUCURSAL", "TECNICO", "TRABAJADOR"] as const;
 
-type TabId = "empresa" | "sucursales" | "usuarios" | "parametros" | "notificaciones" | "micuenta";
+type TabId = "empresa" | "sucursales" | "zonas" | "usuarios" | "parametros" | "notificaciones" | "micuenta";
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "empresa",        label: "Empresa",       icon: Building2 },
   { id: "sucursales",     label: "Sucursales",    icon: MapPin    },
+  { id: "zonas",          label: "Zonas",         icon: Layers    },
   { id: "usuarios",       label: "Usuarios",      icon: Users     },
   { id: "parametros",     label: "Parámetros PM", icon: Settings2 },
   { id: "notificaciones", label: "Notificaciones",icon: Bell      },
@@ -353,6 +355,180 @@ function TabSucursales({ sucursales: initialSucursales, zonas }: { sucursales: S
                 : prev.map((x) => x.id === s.id ? s : x)
             );
             setModalSuc(null);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+// ── Tab: Zonas ─────────────────────────────────────────────────
+
+function ZonaModal({
+  zona,
+  onClose,
+  onSaved,
+}: {
+  zona:    ZonaData | null;
+  onClose: () => void;
+  onSaved: (z: ZonaData) => void;
+}) {
+  const esEdicion = !!zona;
+  const [nombre,  setNombre]  = useState(zona?.nombre ?? "");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    if (esEdicion) {
+      const result = await editarZona(zona!.id, nombre);
+      setLoading(false);
+      if (!result.ok) { toast.error("Error", { description: result.error }); return; }
+      onSaved({ ...zona!, nombre: nombre.trim() });
+      toast.success("Zona actualizada");
+    } else {
+      const result = await crearZona(nombre);
+      setLoading(false);
+      if (!result.ok) { toast.error("Error", { description: result.error }); return; }
+      onSaved({ id: (result as { ok: true; id?: string }).id ?? crypto.randomUUID(), nombre: nombre.trim(), sucursalesCount: 0 });
+      toast.success("Zona creada");
+    }
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="fixed inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-bg-primary p-6 shadow-xl">
+        <h2 className="mb-4 text-base font-semibold text-text-primary">
+          {esEdicion ? "Editar zona" : "Nueva zona"}
+        </h2>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">Nombre de la zona</label>
+            <input
+              required
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Ej. Zona Norte"
+              className="h-9 rounded-lg border border-border bg-bg-primary px-3 text-sm text-text-primary placeholder:text-text-tertiary focus:border-brand-blue focus:outline-none"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose}
+              className="h-9 rounded-lg border border-border px-4 text-sm text-text-secondary hover:bg-bg-secondary">
+              Cancelar
+            </button>
+            <button type="submit" disabled={loading}
+              className="flex h-9 items-center gap-1.5 rounded-lg bg-brand-blue px-4 text-sm font-medium text-white hover:bg-brand-blue/90 disabled:opacity-60">
+              {loading && <Loader2 size={13} className="animate-spin" />}
+              {esEdicion ? "Guardar cambios" : "Crear zona"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function TabZonas({ zonas: initialZonas }: { zonas: ZonaData[] }) {
+  const [lista,     setLista]     = useState<ZonaData[]>(initialZonas);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [modal,     setModal]     = useState<ZonaData | null | "nueva">(null);
+
+  async function handleEliminar(zonaId: string, count: number) {
+    if (count > 0) {
+      toast.error("No se puede eliminar", { description: `Tiene ${count} sucursal(es) asignada(s). Reasígnalas primero.` });
+      return;
+    }
+    if (!confirm("¿Eliminar esta zona? Esta acción no se puede deshacer.")) return;
+    setLoadingId(zonaId);
+    const result = await eliminarZona(zonaId);
+    setLoadingId(null);
+    if (!result.ok) { toast.error("Error", { description: result.error }); return; }
+    setLista((prev) => prev.filter((z) => z.id !== zonaId));
+    toast.success("Zona eliminada");
+  }
+
+  return (
+    <>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-text-tertiary">{lista.length} zona{lista.length !== 1 ? "s" : ""} configurada{lista.length !== 1 ? "s" : ""}</span>
+          <button onClick={() => setModal("nueva")}
+            className="flex h-8 items-center gap-1.5 rounded-lg bg-brand-blue px-3 text-sm font-medium text-white hover:bg-brand-blue/90">
+            <Plus size={13} />
+            Nueva zona
+          </button>
+        </div>
+
+        <div className="overflow-hidden rounded-xl border border-border bg-bg-primary">
+          <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 border-b border-border bg-bg-secondary px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+            <span>Zona</span><span>Sucursales</span><span></span><span></span>
+          </div>
+
+          {lista.length === 0 && (
+            <div className="px-4 py-8 text-center text-sm text-text-tertiary">
+              No hay zonas. Crea la primera para organizar tus sucursales.
+            </div>
+          )}
+
+          {lista.map((z, i) => {
+            const busy = loadingId === z.id;
+            return (
+              <div key={z.id} className={cn(
+                "grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-4 py-3",
+                i < lista.length - 1 && "border-b border-border",
+              )}>
+                <div className="flex items-center gap-2">
+                  <Layers size={14} className="shrink-0 text-brand-blue-mid" />
+                  <span className="text-sm font-medium text-text-primary">{z.nombre}</span>
+                </div>
+                <span className="text-xs text-text-secondary">
+                  {z.sucursalesCount} sucursal{z.sucursalesCount !== 1 ? "es" : ""}
+                </span>
+                {busy
+                  ? <Loader2 size={14} className="animate-spin text-text-tertiary" />
+                  : (
+                    <button disabled={busy} onClick={() => setModal(z)} title="Editar"
+                      className="rounded p-1 text-text-tertiary hover:bg-bg-secondary hover:text-brand-blue disabled:opacity-50">
+                      <Pencil size={13} />
+                    </button>
+                  )
+                }
+                <button
+                  disabled={busy}
+                  onClick={() => handleEliminar(z.id, z.sucursalesCount)}
+                  title={z.sucursalesCount > 0 ? "Tiene sucursales asignadas" : "Eliminar"}
+                  className={cn(
+                    "rounded p-1 disabled:opacity-50",
+                    z.sucursalesCount > 0
+                      ? "cursor-not-allowed text-text-tertiary opacity-40"
+                      : "text-text-tertiary hover:bg-status-danger-bg hover:text-status-danger"
+                  )}>
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        <p className="text-xs text-text-tertiary">
+          Para eliminar una zona primero reasigna sus sucursales desde el tab <strong>Sucursales</strong>.
+        </p>
+      </div>
+
+      {modal !== null && (
+        <ZonaModal
+          zona={modal === "nueva" ? null : modal}
+          onClose={() => setModal(null)}
+          onSaved={(z) => {
+            setLista((prev) =>
+              modal === "nueva"
+                ? [...prev, z]
+                : prev.map((x) => x.id === z.id ? { ...x, nombre: z.nombre } : x)
+            );
+            setModal(null);
           }}
         />
       )}
@@ -979,6 +1155,7 @@ export function ConfiguracionClient({
       <div>
         {activeTab === "empresa"        && <TabEmpresa empresa={empresa} total={usuarios.length} />}
         {activeTab === "sucursales"     && <TabSucursales sucursales={sucursales} zonas={zonas} />}
+        {activeTab === "zonas"          && <TabZonas zonas={zonas} />}
         {activeTab === "usuarios"       && <TabUsuarios initialUsuarios={usuarios} sucursalesOpts={sucursalesOpts} />}
         {activeTab === "parametros"     && <TabParametros />}
         {activeTab === "notificaciones" && <TabNotificaciones />}
