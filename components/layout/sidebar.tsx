@@ -14,6 +14,7 @@ import {
   History,
   Settings,
   LogOut,
+  BarChart2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -54,8 +55,9 @@ const NAV: NavSection[] = [
   {
     section: "Reportes",
     items: [
-      { id: "historial",     label: "Historial",     href: "/historial",     icon: History  },
-      { id: "configuracion", label: "Configuración", href: "/configuracion", icon: Settings },
+      { id: "historial",     label: "Historial",        href: "/historial",     icon: History   },
+      { id: "presupuestos",  label: "Presupuestos",     href: "/presupuestos",  icon: BarChart2 },
+      { id: "configuracion", label: "Configuración",    href: "/configuracion", icon: Settings  },
     ],
   },
 ];
@@ -65,7 +67,7 @@ const NAV_VISIBLE: Record<string, Set<string>> = {
   GERENTE_SUCURSAL: new Set([
     "dashboard", "alertas", "incidencias", "ordenes",
     "preventivos", "equipos", "inventario", "calendario",
-    "historial", "configuracion",
+    "historial", "presupuestos", "configuracion",
   ]),
   TECNICO: new Set(["dashboard", "incidencias", "ordenes", "calendario", "historial"]),
   TRABAJADOR: new Set(["incidencias"]),

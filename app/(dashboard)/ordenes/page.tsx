@@ -25,6 +25,16 @@ export default async function OrdenesPage() {
           select: { tipo: true, cu: true, sucursal: { select: { id: true, nombre: true } } },
         },
         tecnico:  { select: { nombre: true, iniciales: true } },
+        facturas: {
+          orderBy: { fechaEmision: "asc" },
+          select: {
+            id: true, numero: true, uuid: true, proveedor: true,
+            nombreEmisor: true, rfcEmisor: true,
+            monto: true, subtotal: true, iva: true,
+            fechaEmision: true, fechaPago: true,
+            estado: true, concepto: true,
+          },
+        },
         bitacora: {
           orderBy: { createdAt: "asc" },
           select: {
@@ -72,7 +82,7 @@ export default async function OrdenesPage() {
 
   return (
     <OrdenesClient
-      ordenes={ordenes}
+      ordenes={ordenes as any}
       sucursales={sucursales.map((s) => ({ id: s.id, nombre: s.nombre, zonaId: s.zonaId, equiposConFalla: s._count.equipos }))}
       zonas={zonas}
       puedeFiltraSucursal={rol !== "GERENTE_SUCURSAL"}

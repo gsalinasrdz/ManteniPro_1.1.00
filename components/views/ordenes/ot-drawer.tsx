@@ -9,7 +9,12 @@ import { Badge } from "@/components/atoms/badge";
 import { useUploadThing } from "@/lib/uploadthing";
 import { agregarBitacora } from "@/lib/actions/ot";
 import { toast } from "sonner";
+import { CostosSection } from "@/components/views/ordenes/costos-section";
+import { FacturasSection } from "@/components/views/ordenes/factura-section";
+import type { FacturaEntry } from "@/components/views/ordenes/factura-section";
 import type { OrdenTrabajo, Equipo, Sucursal, Usuario } from "@prisma/client";
+
+export type { FacturaEntry };
 
 export type BitacoraEntry = {
   id: string;
@@ -22,8 +27,9 @@ export type OrdenConRelaciones = OrdenTrabajo & {
   equipo: Pick<Equipo, "tipo" | "cu"> & {
     sucursal: Pick<Sucursal, "id" | "nombre">;
   };
-  tecnico: Pick<Usuario, "nombre" | "iniciales"> | null;
+  tecnico:  Pick<Usuario, "nombre" | "iniciales"> | null;
   bitacora: BitacoraEntry[];
+  facturas: FacturaEntry[];
 };
 
 // ── Visual maps ────────────────────────────────────────────────
@@ -347,9 +353,12 @@ interface OtDrawerProps {
   onAsignar:           (otId: string, tecnicoId: string | null) => void;
   onEvidenciasAdded:   (otId: string, urls: string[]) => void;
   onBitacoraAdded:     (otId: string, entry: BitacoraEntry) => void;
+  onCostosUpdated:     (otId: string, estimado: number | null, real: number | null) => void;
+  onFacturaAdded:      (otId: string, factura: FacturaEntry) => void;
+  onFacturaUpdated:    (otId: string, facturaId: string, changes: Partial<FacturaEntry>) => void;
 }
 
-export function OtDrawer({ ot, tecnicos, onClose, onTransition, onAsignar, onEvidenciasAdded, onBitacoraAdded }: OtDrawerProps) {
+export function OtDrawer({ ot, tecnicos, onClose, onTransition, onAsignar, onEvidenciasAdded, onBitacoraAdded, onCostosUpdated, onFacturaAdded, onFacturaUpdated }: OtDrawerProps) {
   const isOpen = Boolean(ot);
   const [tecnicoSel, setTecnicoSel] = useState<string>("");
 
@@ -485,6 +494,23 @@ export function OtDrawer({ ot, tecnicos, onClose, onTransition, onAsignar, onEvi
                 evidencias={ot.evidencias}
                 activa={ot.estado !== "CERRADA" && ot.estado !== "CANCELADA"}
                 onAdded={(urls) => onEvidenciasAdded(ot.id, urls)}
+              />
+
+              {/* Costos */}
+              <CostosSection
+                otId={ot.id}
+                costoEstimado={ot.costoEstimado ? Number(ot.costoEstimado) : null}
+                costoReal={ot.costo ? Number(ot.costo) : null}
+                onUpdated={(e, r) => onCostosUpdated(ot.id, e, r)}
+              />
+
+              {/* Facturas */}
+              <FacturasSection
+                otId={ot.id}
+                tecnicoId={ot.tecnicoId}
+                facturas={ot.facturas}
+                onAdded={(f) => onFacturaAdded(ot.id, f)}
+                onUpdated={(fid, changes) => onFacturaUpdated(ot.id, fid, changes)}
               />
 
               {/* Bitácora */}

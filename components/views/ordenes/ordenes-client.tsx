@@ -14,7 +14,7 @@ import { es } from "date-fns/locale";
 import { Search, SlidersHorizontal, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { OtDrawer } from "@/components/views/ordenes/ot-drawer";
-import type { OrdenConRelaciones, BitacoraEntry } from "@/components/views/ordenes/ot-drawer";
+import type { OrdenConRelaciones, BitacoraEntry, FacturaEntry } from "@/components/views/ordenes/ot-drawer";
 import { NuevaOTModal } from "@/components/modals/nueva-ot-modal";
 import { transitionOT, asignarTecnico, agregarEvidenciaOT } from "@/lib/actions/ot";
 
@@ -171,6 +171,41 @@ export function OrdenesClient({
       if (!r.ok) toast.error("Error", { description: r.error });
       else toast.success(`${urls.length} foto${urls.length > 1 ? "s" : ""} guardada${urls.length > 1 ? "s" : ""}`);
     });
+  }
+
+  function handleCostosUpdated(otId: string, estimado: number | null, real: number | null) {
+    setOrdenes((prev) =>
+      prev.map((ot) =>
+        ot.id === otId ? { ...ot, costoEstimado: estimado as any, costo: real as any } : ot
+      )
+    );
+    setSelectedOT((s) =>
+      s?.id === otId ? { ...s, costoEstimado: estimado as any, costo: real as any } : s
+    );
+  }
+
+  function handleFacturaAdded(otId: string, factura: FacturaEntry) {
+    setOrdenes((prev) =>
+      prev.map((ot) =>
+        ot.id === otId ? { ...ot, facturas: [...ot.facturas, factura] } : ot
+      )
+    );
+    setSelectedOT((s) =>
+      s?.id === otId ? { ...s, facturas: [...s.facturas, factura] } : s
+    );
+  }
+
+  function handleFacturaUpdated(otId: string, facturaId: string, changes: Partial<FacturaEntry>) {
+    const apply = (list: FacturaEntry[]) =>
+      list.map((f) => (f.id === facturaId ? { ...f, ...changes } : f));
+    setOrdenes((prev) =>
+      prev.map((ot) =>
+        ot.id === otId ? { ...ot, facturas: apply(ot.facturas) } : ot
+      )
+    );
+    setSelectedOT((s) =>
+      s?.id === otId ? { ...s, facturas: apply(s.facturas) } : s
+    );
   }
 
   function handleBitacoraAdded(otId: string, entry: BitacoraEntry) {
@@ -363,6 +398,9 @@ export function OrdenesClient({
         onAsignar={handleAsignar}
         onEvidenciasAdded={handleEvidenciasAdded}
         onBitacoraAdded={handleBitacoraAdded}
+        onCostosUpdated={handleCostosUpdated}
+        onFacturaAdded={handleFacturaAdded}
+        onFacturaUpdated={handleFacturaUpdated}
       />
 
       <NuevaOTModal

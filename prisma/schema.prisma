@@ -53,8 +53,9 @@ model Sucursal {
   activa      Boolean  @default(true)
   createdAt   DateTime @default(now())
 
-  equipos     Equipo[]
-  usuarios    Usuario[]
+  equipos          Equipo[]
+  usuarios         Usuario[]
+  presupuestos     PresupuestoSucursal[]
 
   @@index([empresaId])
   @@index([zonaId])
@@ -84,6 +85,7 @@ model Usuario {
   incidenciasReporta Incidencia[] @relation("IncReporta")
   actividad    Actividad[]
   bitacoras    Bitacora[]
+  facturas     Factura[]
 
   @@index([empresaId])
   @@index([sucursalId])
@@ -153,12 +155,14 @@ model OrdenTrabajo {
   programada  DateTime
   iniciada    DateTime?
   cerrada     DateTime?
-  costo       Decimal? @db.Decimal(10, 2)
+  costoEstimado Decimal? @db.Decimal(10, 2)
+  costo         Decimal? @db.Decimal(10, 2)  // costo real al cerrar
   evidencias  String[] // URLs de fotos
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   bitacora    Bitacora[]
+  facturas    Factura[]
   refaccionesUsadas RefaccionUsada[]
 
   @@index([equipoId])
@@ -313,4 +317,51 @@ model Actividad {
 
   @@index([actorId])
   @@index([createdAt])
+}
+
+// ── Facturas / Presupuestos ──────────────────────────────────
+
+enum EstadoFactura {
+  PENDIENTE
+  PAGADA
+  CANCELADA
+}
+
+model Factura {
+  id           String        @id @default(cuid())
+  ordenId      String
+  orden        OrdenTrabajo  @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  tecnicoId    String?
+  tecnico      Usuario?      @relation(fields: [tecnicoId], references: [id])
+  numero       String
+  uuid         String?       @unique  // UUID fiscal CFDI del SAT
+  rfcEmisor    String?
+  nombreEmisor String?
+  proveedor    String
+  monto        Decimal       @db.Decimal(10, 2)
+  subtotal     Decimal?      @db.Decimal(10, 2)
+  iva          Decimal?      @db.Decimal(10, 2)
+  fechaEmision DateTime
+  fechaPago    DateTime?
+  estado       EstadoFactura @default(PENDIENTE)
+  urlXml       String?
+  concepto     String?
+  createdAt    DateTime      @default(now())
+
+  @@index([ordenId])
+  @@index([tecnicoId])
+  @@index([estado])
+  @@index([fechaEmision])
+}
+
+model PresupuestoSucursal {
+  id         String   @id @default(cuid())
+  sucursalId String
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  periodo    String   // "2026-05" (año-mes)
+  monto      Decimal  @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+
+  @@unique([sucursalId, periodo])
+  @@index([sucursalId])
 }
