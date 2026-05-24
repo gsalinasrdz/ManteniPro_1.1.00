@@ -24,7 +24,14 @@ export default async function OrdenesPage() {
         equipo: {
           select: { tipo: true, cu: true, sucursal: { select: { id: true, nombre: true } } },
         },
-        tecnico: { select: { nombre: true, iniciales: true } },
+        tecnico:  { select: { nombre: true, iniciales: true } },
+        bitacora: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true, texto: true, createdAt: true,
+            autor: { select: { nombre: true, iniciales: true } },
+          },
+        },
       },
       orderBy: { programada: "desc" },
     }),

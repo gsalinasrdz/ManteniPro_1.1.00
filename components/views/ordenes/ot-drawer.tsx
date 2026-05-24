@@ -1,19 +1,29 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { X, Wrench, MapPin, Calendar, User, ArrowRight, CheckCircle2, Camera, ImageIcon, Loader2 } from "lucide-react";
-import { format } from "date-fns";
+import { useState, useRef, useTransition } from "react";
+import { X, Wrench, MapPin, Calendar, User, ArrowRight, CheckCircle2, Camera, ImageIcon, Loader2, MessageSquare, Send } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/atoms/badge";
 import { useUploadThing } from "@/lib/uploadthing";
+import { agregarBitacora } from "@/lib/actions/ot";
+import { toast } from "sonner";
 import type { OrdenTrabajo, Equipo, Sucursal, Usuario } from "@prisma/client";
+
+export type BitacoraEntry = {
+  id: string;
+  texto: string;
+  createdAt: Date;
+  autor: Pick<Usuario, "nombre" | "iniciales"> | null;
+};
 
 export type OrdenConRelaciones = OrdenTrabajo & {
   equipo: Pick<Equipo, "tipo" | "cu"> & {
     sucursal: Pick<Sucursal, "id" | "nombre">;
   };
   tecnico: Pick<Usuario, "nombre" | "iniciales"> | null;
+  bitacora: BitacoraEntry[];
 };
 
 // ── Visual maps ────────────────────────────────────────────────
@@ -133,6 +143,96 @@ const TRANSITIONS: Record<string, TransitionAction[]> = {
 
 export type TecnicoOption = Pick<Usuario, "id" | "nombre" | "iniciales">;
 
+// ── Bitácora section ───────────────────────────────────────────
+
+function BitacoraSection({
+  otId,
+  entradas,
+  onAdded,
+}: {
+  otId:     string;
+  entradas: BitacoraEntry[];
+  onAdded:  (entry: BitacoraEntry) => void;
+}) {
+  const [texto, setTexto]     = useState("");
+  const [pending, startTrans] = useTransition();
+
+  function handleSubmit() {
+    const t = texto.trim();
+    if (!t) return;
+    startTrans(async () => {
+      const result = await agregarBitacora(otId, t);
+      if (!result.ok) {
+        toast.error("Error", { description: result.error });
+        return;
+      }
+      onAdded({
+        id:        crypto.randomUUID(),
+        texto:     t,
+        createdAt: new Date(),
+        autor:     null,
+      });
+      setTexto("");
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-text-tertiary">
+        Bitácora {entradas.length > 0 && `(${entradas.length})`}
+      </span>
+
+      {/* Feed */}
+      {entradas.length === 0 ? (
+        <div className="flex h-14 items-center justify-center rounded-lg border border-dashed border-border text-xs text-text-tertiary">
+          <MessageSquare size={12} className="mr-1.5 opacity-50" />
+          Sin notas registradas
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {entradas.map((e) => (
+            <div key={e.id} className="rounded-lg border border-border bg-bg-secondary px-3 py-2.5">
+              <p className="text-xs leading-relaxed text-text-primary">{e.texto}</p>
+              <div className="mt-1.5 flex items-center gap-1.5">
+                {e.autor && (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-blue-light text-[9px] font-bold text-brand-blue">
+                    {e.autor.iniciales}
+                  </span>
+                )}
+                <span className="text-[10px] text-text-tertiary">
+                  {e.autor?.nombre ?? "Tú"} ·{" "}
+                  {formatDistanceToNow(new Date(e.createdAt), { locale: es, addSuffix: true })}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Input */}
+      <div className="flex items-end gap-2">
+        <textarea
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSubmit();
+          }}
+          placeholder="Agregar nota… (⌘↵ para enviar)"
+          rows={2}
+          className="flex-1 resize-none rounded-lg border border-border bg-bg-primary px-3 py-2 text-xs text-text-primary placeholder:text-text-tertiary focus:border-brand-blue focus:outline-none"
+        />
+        <button
+          onClick={handleSubmit}
+          disabled={!texto.trim() || pending}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-blue text-white transition-colors hover:bg-brand-blue/90 disabled:opacity-40"
+        >
+          {pending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Evidencias uploader ────────────────────────────────────────
 
 function EvidenciasSection({
@@ -246,9 +346,10 @@ interface OtDrawerProps {
   onTransition:        (otId: string, nextEstado: string) => void;
   onAsignar:           (otId: string, tecnicoId: string | null) => void;
   onEvidenciasAdded:   (otId: string, urls: string[]) => void;
+  onBitacoraAdded:     (otId: string, entry: BitacoraEntry) => void;
 }
 
-export function OtDrawer({ ot, tecnicos, onClose, onTransition, onAsignar, onEvidenciasAdded }: OtDrawerProps) {
+export function OtDrawer({ ot, tecnicos, onClose, onTransition, onAsignar, onEvidenciasAdded, onBitacoraAdded }: OtDrawerProps) {
   const isOpen = Boolean(ot);
   const [tecnicoSel, setTecnicoSel] = useState<string>("");
 
@@ -384,6 +485,13 @@ export function OtDrawer({ ot, tecnicos, onClose, onTransition, onAsignar, onEvi
                 evidencias={ot.evidencias}
                 activa={ot.estado !== "CERRADA" && ot.estado !== "CANCELADA"}
                 onAdded={(urls) => onEvidenciasAdded(ot.id, urls)}
+              />
+
+              {/* Bitácora */}
+              <BitacoraSection
+                otId={ot.id}
+                entradas={ot.bitacora}
+                onAdded={(entry) => onBitacoraAdded(ot.id, entry)}
               />
             </div>
 

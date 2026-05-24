@@ -83,6 +83,7 @@ model Usuario {
   pmsAsignado  Preventivo[]   @relation("PMTecnico")
   incidenciasReporta Incidencia[] @relation("IncReporta")
   actividad    Actividad[]
+  bitacoras    Bitacora[]
 
   @@index([empresaId])
   @@index([sucursalId])
@@ -295,6 +296,7 @@ model Bitacora {
   orden     OrdenTrabajo @relation(fields: [ordenId], references: [id], onDelete: Cascade)
   texto     String
   autorId   String?
+  autor     Usuario? @relation(fields: [autorId], references: [id])
   createdAt DateTime @default(now())
 
   @@index([ordenId])

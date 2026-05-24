@@ -69,6 +69,24 @@ export async function asignarTecnico(
   }
 }
 
+export async function agregarBitacora(
+  ordenId: string,
+  texto: string
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session) return { ok: false, error: "No autenticado" };
+
+  try {
+    await db.bitacora.create({
+      data: { ordenId, texto, autorId: session.user.id },
+    });
+    revalidatePath("/ordenes");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Error al guardar la nota" };
+  }
+}
+
 export async function crearOrdenTrabajo(input: {
   equipoId:    string;
   tipo:        string;
