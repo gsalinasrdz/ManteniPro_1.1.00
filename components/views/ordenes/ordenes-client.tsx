@@ -11,7 +11,7 @@ import { shortenSucursal } from "@/lib/utils";
 import type { OrdenTrabajo } from "@prisma/client";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Search, SlidersHorizontal, Plus } from "lucide-react";
+import { Search, SlidersHorizontal, Plus, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { OtDrawer } from "@/components/views/ordenes/ot-drawer";
 import type { OrdenConRelaciones, BitacoraEntry, FacturaEntry } from "@/components/views/ordenes/ot-drawer";
@@ -57,6 +57,23 @@ const ESTADO_TONE: Record<string, "gray" | "info" | "warn" | "ok"> = {
   CERRADA: "ok", CANCELADA: "gray",
 };
 
+const NEXT_ESTADOS: Record<string, { estado: string; label: string }[]> = {
+  PROGRAMADA: [
+    { estado: "ASIGNADA",   label: "→ Marcar asignada"  },
+    { estado: "CANCELADA",  label: "✕ Cancelar OT"      },
+  ],
+  ASIGNADA: [
+    { estado: "EN_PROCESO", label: "→ Iniciar trabajo"  },
+    { estado: "CANCELADA",  label: "✕ Cancelar OT"      },
+  ],
+  EN_PROCESO: [
+    { estado: "CERRADA",    label: "✓ Cerrar OT"        },
+    { estado: "CANCELADA",  label: "✕ Cancelar OT"      },
+  ],
+  CERRADA:   [],
+  CANCELADA: [],
+};
+
 const TRANSITION_TOAST: Record<string, { title: string; desc: (num: string) => string }> = {
   ASIGNADA:   { title: "OT asignada",  desc: (n) => `${n} marcada como asignada.`   },
   EN_PROCESO: { title: "OT iniciada",  desc: (n) => `${n} marcada como En proceso.` },
@@ -83,6 +100,7 @@ export function OrdenesClient({
   const [ordenes, setOrdenes]           = useState<OrdenConRelaciones[]>(initialOrdenes);
   const [selectedOT, setSelectedOT]     = useState<OrdenConRelaciones | null>(null);
   const [modalNuevaOT, setModalNuevaOT] = useState(false);
+  const [statusOpenId, setStatusOpenId] = useState<string | null>(null);
 
   // Sync after router.refresh()
   useEffect(() => { setOrdenes(initialOrdenes); }, [initialOrdenes]);
@@ -361,8 +379,36 @@ export function OrdenesClient({
                           {ot.prioridad.charAt(0) + ot.prioridad.slice(1).toLowerCase()}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3">
-                        <Badge tone={ESTADO_TONE[ot.estado]}>{ESTADO_LABEL[ot.estado]}</Badge>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        {(NEXT_ESTADOS[ot.estado]?.length ?? 0) > 0 ? (
+                          <div className="relative inline-block">
+                            <button
+                              onClick={() => setStatusOpenId(statusOpenId === ot.id ? null : ot.id)}
+                              className="flex items-center gap-1 rounded focus:outline-none"
+                            >
+                              <Badge tone={ESTADO_TONE[ot.estado]}>{ESTADO_LABEL[ot.estado]}</Badge>
+                              <ChevronDown size={10} className="text-text-tertiary" />
+                            </button>
+                            {statusOpenId === ot.id && (
+                              <>
+                                <div className="fixed inset-0 z-10" onClick={() => setStatusOpenId(null)} />
+                                <div className="absolute left-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-border bg-bg-primary shadow-lg">
+                                  {NEXT_ESTADOS[ot.estado]!.map((next) => (
+                                    <button
+                                      key={next.estado}
+                                      onClick={() => { setStatusOpenId(null); handleTransition(ot.id, next.estado); }}
+                                      className="block w-full px-3 py-2 text-left text-xs text-text-secondary hover:bg-bg-secondary hover:text-text-primary"
+                                    >
+                                      {next.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          <Badge tone={ESTADO_TONE[ot.estado]}>{ESTADO_LABEL[ot.estado]}</Badge>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {ot.tecnico ? (

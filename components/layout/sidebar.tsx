@@ -82,9 +82,10 @@ const ROL_LABEL: Record<string, string> = {
 
 interface SidebarProps {
   usuario: { nombre: string; rol: string; iniciales: string };
+  alertCount?: number;
 }
 
-export function Sidebar({ usuario }: SidebarProps) {
+export function Sidebar({ usuario, alertCount = 0 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -137,6 +138,11 @@ export function Sidebar({ usuario }: SidebarProps) {
                 >
                   <Icon size={15} />
                   <span className="flex-1">{item.label}</span>
+                  {item.id === "alertas" && alertCount > 0 && (
+                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-status-danger px-1 text-[9px] font-bold text-white">
+                      {alertCount > 99 ? "99+" : alertCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
