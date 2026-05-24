@@ -1,15 +1,22 @@
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
-import { format, startOfMonth, subMonths, parseISO } from "date-fns";
+import dynamic from "next/dynamic";
+import { format, startOfMonth, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   DollarSign, Receipt, TrendingUp, TrendingDown,
-  CheckCircle2, Clock, XCircle, Download, ChevronDown, ChevronUp, Loader2,
+  CheckCircle2, Clock, XCircle, Download, Printer, ChevronDown, ChevronUp, Loader2, BarChart2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { setPresupuestoSucursal } from "@/lib/actions/factura";
+import type { GastosDataPoint } from "./gastos-chart";
+
+const GastosChart = dynamic(
+  () => import("./gastos-chart").then((m) => m.GastosChart),
+  { ssr: false, loading: () => <div className="flex h-[200px] items-center justify-center text-xs text-text-tertiary">Cargando gráfica…</div> }
+);
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -105,9 +112,18 @@ export function PresupuestosClient({ sucursales, tecnicos, facturas, ordenesCost
   return (
     <div className="flex flex-col gap-4 p-6">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold text-text-primary">Presupuestos & Facturas</h1>
-        <p className="mt-0.5 text-sm text-text-tertiary">Control de costos por sucursal y técnico</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-text-primary">Presupuestos & Facturas</h1>
+          <p className="mt-0.5 text-sm text-text-tertiary">Control de costos por sucursal y técnico</p>
+        </div>
+        <button
+          onClick={() => window.print()}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-bg-primary px-3 py-2 text-xs text-text-secondary transition-colors hover:bg-bg-secondary print:hidden"
+        >
+          <Printer size={13} />
+          Imprimir
+        </button>
       </div>
 
       {/* Tabs */}
@@ -166,6 +182,7 @@ function TabSucursales({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editMonto, setEditMonto] = useState("");
   const [pending, start] = useTransition();
+  const [showChart, setShowChart] = useState(true);
 
   // Build list of available periods (last 6 months)
   const periodos = useMemo(() => {
@@ -173,6 +190,28 @@ function TabSucursales({
       format(subMonths(startOfMonth(new Date()), i), "yyyy-MM")
     );
   }, []);
+
+  // Build chart data: last 6 months × sucursal, pagadas only
+  const chartData = useMemo<GastosDataPoint[]>(() => {
+    const months = Array.from({ length: 6 }, (_, i) =>
+      format(subMonths(startOfMonth(new Date()), 5 - i), "yyyy-MM")
+    );
+    return months.map((m) => {
+      const label = periodoLabel(m);
+      const point: GastosDataPoint = { mes: label };
+      for (const s of sucursales) {
+        point[s.nombre] = facturas
+          .filter(
+            (f) =>
+              f.orden.equipo.sucursal.id === s.id &&
+              format(new Date(f.fechaEmision), "yyyy-MM") === m &&
+              f.estado === "PAGADA"
+          )
+          .reduce((sum, f) => sum + Number(f.monto), 0);
+      }
+      return point;
+    });
+  }, [facturas, sucursales]);
 
   // Facturas del período seleccionado
   const facturasPeriodo = useMemo(() =>
@@ -247,6 +286,25 @@ function TabSucursales({
           icon={kpi.totalGastado > kpi.totalPresupuesto ? TrendingUp : TrendingDown}
           color={kpi.totalGastado > kpi.totalPresupuesto ? "text-status-danger" : "text-status-ok"}
         />
+      </div>
+
+      {/* Chart: gasto por sucursal últimos 6 meses */}
+      <div className="rounded-xl border border-border bg-bg-primary overflow-hidden">
+        <button
+          onClick={() => setShowChart((v) => !v)}
+          className="flex w-full items-center justify-between px-4 py-3 text-xs font-medium text-text-secondary hover:bg-bg-secondary transition-colors"
+        >
+          <div className="flex items-center gap-1.5">
+            <BarChart2 size={13} className="text-text-tertiary" />
+            Gasto por sucursal — últimos 6 meses
+          </div>
+          {showChart ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        </button>
+        {showChart && (
+          <div className="px-4 pb-4">
+            <GastosChart data={chartData} sucursales={sucursales} />
+          </div>
+        )}
       </div>
 
       {/* Tabla por sucursal */}

@@ -4,7 +4,7 @@ import { EstadoOT, EstadoIncidencia, EstadoEquipo, EstadoPM } from "@prisma/clie
 import { KpiCard } from "@/components/atoms/kpi";
 import { AlertTriangle, ClipboardList, Wrench, Boxes } from "lucide-react";
 import Link from "next/link";
-import { format, isToday, isTomorrow, isPast, startOfDay } from "date-fns";
+import { format, isToday, isPast, startOfDay, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 
 export default async function DashboardPage() {
@@ -112,7 +112,13 @@ export default async function DashboardPage() {
       ? { id: userSucId }
       : { empresaId, activa: true };
 
-  const [otActivas, incActivas, equiposFalla, pmVencidos, sucursales] = await Promise.all([
+  const now         = new Date();
+  const startThis   = startOfMonth(now);
+  const startLast   = startOfMonth(subMonths(now, 1));
+  const endLast     = endOfMonth(subMonths(now, 1));
+
+  const [otActivas, incActivas, equiposFalla, pmVencidos, sucursales,
+         otThisMes, otLastMes, incThisMes, incLastMes] = await Promise.all([
     db.ordenTrabajo.count({
       where: {
         equipo: equipoWhere,
@@ -152,7 +158,14 @@ export default async function DashboardPage() {
       },
       orderBy: { nombre: "asc" },
     }),
+    db.ordenTrabajo.count({ where: { equipo: equipoWhere, createdAt: { gte: startThis } } }),
+    db.ordenTrabajo.count({ where: { equipo: equipoWhere, createdAt: { gte: startLast, lte: endLast } } }),
+    db.incidencia.count({ where: { equipo: equipoWhere, createdAt: { gte: startThis } } }),
+    db.incidencia.count({ where: { equipo: equipoWhere, createdAt: { gte: startLast, lte: endLast } } }),
   ]);
+
+  const otTrend  = otThisMes  - otLastMes;
+  const incTrend = incThisMes - incLastMes;
 
   return (
     <div className="space-y-6">
@@ -163,12 +176,14 @@ export default async function DashboardPage() {
           value={otActivas}
           icon={<ClipboardList size={16} />}
           variant={otActivas > 5 ? "warn" : "default"}
+          trend={{ delta: otTrend }}
         />
         <KpiCard
           label="Incidencias abiertas"
           value={incActivas}
           icon={<AlertTriangle size={16} />}
           variant={incActivas > 0 ? "danger" : "ok"}
+          trend={{ delta: incTrend }}
         />
         <KpiCard
           label="Equipos con falla"

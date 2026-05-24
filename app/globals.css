@@ -127,3 +127,20 @@
     background: theme("colors.bg-secondary");
   }
 }
+
+@media print {
+  /* Hide sidebar and topbar; let the main content flow */
+  body > div > *:first-child { display: none !important; }
+  body > div > main > *:first-child { display: none !important; }
+  body > div,
+  body > div > main {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  body > div > main > div {
+    overflow: visible !important;
+    padding: 16px !important;
+  }
+  .print\:hidden { display: none !important; }
+}

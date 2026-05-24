@@ -9,6 +9,7 @@ interface KpiCardProps {
   value: number | string;
   icon?: React.ReactNode;
   variant?: KpiVariant;
+  trend?: { delta: number } | null;
 }
 
 const variantStyles: Record<KpiVariant, { card: string; value: string; icon: string }> = {
@@ -18,8 +19,11 @@ const variantStyles: Record<KpiVariant, { card: string; value: string; icon: str
   danger:  { card: "border-status-danger-bg",        value: "text-status-danger", icon: "text-status-danger" },
 };
 
-export function KpiCard({ label, value, icon, variant = "default" }: KpiCardProps) {
+export function KpiCard({ label, value, icon, variant = "default", trend }: KpiCardProps) {
   const s = variantStyles[variant];
+  const showTrend = trend != null;
+  const trendUp   = trend && trend.delta > 0;
+  const trendDown = trend && trend.delta < 0;
   return (
     <div className={cn("rounded-lg border bg-bg-primary px-4 py-3.5", s.card)}>
       <div className="flex items-center justify-between">
@@ -27,6 +31,18 @@ export function KpiCard({ label, value, icon, variant = "default" }: KpiCardProp
         {icon && <span className={cn("opacity-60", s.icon)}>{icon}</span>}
       </div>
       <div className={cn("mt-2 text-3xl font-medium tracking-tight", s.value)}>{value}</div>
+      {showTrend && (
+        <div className={cn(
+          "mt-1.5 flex items-center gap-0.5 text-[10px] font-medium",
+          trendUp   ? "text-status-danger" :
+          trendDown ? "text-status-ok"     :
+                      "text-text-tertiary"
+        )}>
+          {trendUp ? "▲" : trendDown ? "▼" : "—"}
+          {trend.delta !== 0 && <span>{Math.abs(trend.delta)} vs mes anterior</span>}
+          {trend.delta === 0 && <span>igual que mes anterior</span>}
+        </div>
+      )}
     </div>
   );
 }
