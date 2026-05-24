@@ -268,9 +268,10 @@ model Refaccion {
   empresa     Empresa  @relation(fields: [empresaId], references: [id])
   nombre      String
   categoria   String
-  stock       Int      @default(0)
-  min         Int      @default(0)
-  max         Int      @default(0)
+  stock         Int      @default(0)
+  min           Int      @default(0)
+  puntoReorden  Int      @default(0)
+  max           Int      @default(0)
   costo       Decimal  @db.Decimal(10, 2)
   ubicacion   String?
   createdAt   DateTime @default(now())
