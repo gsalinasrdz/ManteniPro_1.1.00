@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   startOfMonth, endOfMonth,
   startOfWeek, endOfWeek,
@@ -9,7 +10,7 @@ import {
   format, addMonths, subMonths, isToday,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, Plus, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/atoms/badge";
 import { LocationBadge } from "@/components/atoms/location-badge";
@@ -72,7 +73,16 @@ const LEYENDA: { tipo: TipoEvento; label: string }[] = [
 
 // ── Day detail panel ─────────────────────────────────────────
 
-function DayPanel({ dia, eventos }: { dia: Date | null; eventos: EventoCalendario[] }) {
+const TIPO_HREF: Record<TipoEvento, string> = {
+  ot:            "/ordenes",
+  pm_programado: "/preventivos",
+  pm_proximo:    "/preventivos",
+  pm_vencido:    "/preventivos",
+};
+
+function DayPanel({ dia, eventos, onNuevaOT }: { dia: Date | null; eventos: EventoCalendario[]; onNuevaOT: (fecha: Date) => void }) {
+  const router = useRouter();
+
   if (!dia) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
@@ -86,13 +96,23 @@ function DayPanel({ dia, eventos }: { dia: Date | null; eventos: EventoCalendari
 
   return (
     <div className="flex flex-col gap-3 p-4">
-      <div className="border-b border-border pb-3">
-        <div className="text-md font-semibold text-text-primary capitalize">
-          {format(dia, "EEEE d", { locale: es })}
+      <div className="flex items-start justify-between gap-2 border-b border-border pb-3">
+        <div>
+          <div className="text-md font-semibold text-text-primary capitalize">
+            {format(dia, "EEEE d", { locale: es })}
+          </div>
+          <div className="text-xs text-text-tertiary capitalize">
+            {format(dia, "MMMM yyyy", { locale: es })}
+          </div>
         </div>
-        <div className="text-xs text-text-tertiary capitalize">
-          {format(dia, "MMMM yyyy", { locale: es })}
-        </div>
+        <button
+          onClick={() => onNuevaOT(dia)}
+          title="Nueva OT en este día"
+          className="flex h-7 items-center gap-1 rounded-lg bg-brand-blue px-2.5 text-[11px] font-medium text-white hover:bg-brand-blue/90"
+        >
+          <Plus size={11} />
+          Nueva OT
+        </button>
       </div>
 
       {del_dia.length === 0 ? (
@@ -100,17 +120,21 @@ function DayPanel({ dia, eventos }: { dia: Date | null; eventos: EventoCalendari
       ) : (
         <div className="flex flex-col gap-2">
           {del_dia.map((ev) => (
-            <div
+            <button
               key={ev.id}
-              className="rounded-lg border border-border bg-bg-secondary p-3"
+              onClick={() => router.push(TIPO_HREF[ev.tipo])}
+              className="w-full rounded-lg border border-border bg-bg-secondary p-3 text-left transition-colors hover:border-brand-blue/30 hover:bg-brand-blue-light"
             >
               <div className="flex items-start justify-between gap-2">
                 <Badge tone={TIPO_BADGE_TONE[ev.tipo]} size="sm">
                   {TIPO_LABEL[ev.tipo]}
                 </Badge>
-                {ev.hora && (
-                  <span className="font-mono text-xs text-text-tertiary">{ev.hora}</span>
-                )}
+                <div className="flex items-center gap-1">
+                  {ev.hora && (
+                    <span className="font-mono text-xs text-text-tertiary">{ev.hora}</span>
+                  )}
+                  <ArrowRight size={11} className="text-text-tertiary" />
+                </div>
               </div>
               <p className="mt-1.5 text-xs font-medium leading-snug text-text-primary">
                 {ev.titulo}
@@ -119,7 +143,7 @@ function DayPanel({ dia, eventos }: { dia: Date | null; eventos: EventoCalendari
                 <span className="font-mono text-[10px] text-text-tertiary">{ev.referencia}</span>
                 {ev.sucursal && <LocationBadge sucursal={ev.sucursal} />}
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -130,6 +154,7 @@ function DayPanel({ dia, eventos }: { dia: Date | null; eventos: EventoCalendari
 // ── Main component ───────────────────────────────────────────
 
 export function CalendarioClient({ eventos, hoy = new Date() }: CalendarioClientProps) {
+  const router = useRouter();
   const [currentMonth, setCurrentMonth] = useState<Date>(startOfMonth(hoy));
   const [selectedDay, setSelectedDay]   = useState<Date | null>(hoy);
 
@@ -279,7 +304,14 @@ export function CalendarioClient({ eventos, hoy = new Date() }: CalendarioClient
 
         {/* Day detail panel */}
         <div className="w-64 shrink-0 overflow-hidden rounded-lg border border-border bg-bg-primary">
-          <DayPanel dia={selectedDay} eventos={selectedEvents} />
+          <DayPanel
+            dia={selectedDay}
+            eventos={selectedEvents}
+            onNuevaOT={(fecha) => {
+              const iso = format(fecha, "yyyy-MM-dd");
+              router.push(`/ordenes?fecha=${iso}`);
+            }}
+          />
         </div>
       </div>
     </div>

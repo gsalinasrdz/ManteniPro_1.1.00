@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { EstadoEquipo, EstadoIncidencia, EstadoPM } from "@prisma/client";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
+import { CommandPalette } from "@/components/command-palette/command-palette";
 
 const TITLES: Record<string, string> = {
   "/": "Resumen general",
@@ -63,6 +64,7 @@ export default async function DashboardLayout({
           {children}
         </div>
       </main>
+      <CommandPalette />
     </div>
   );
 }

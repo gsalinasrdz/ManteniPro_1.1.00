@@ -106,3 +106,69 @@ export async function transitionEquipo(
     return { ok: false, error: "Error al actualizar el equipo" };
   }
 }
+
+// ── Historial ───────────────────────────────────────────────────
+
+export type HistorialEntry = {
+  tipo:          "ot" | "incidencia";
+  id:            string;
+  numero:        string;
+  titulo:        string;
+  estado:        string;
+  fecha:         Date;
+  tecnicoNombre?: string;
+  costo?:        number;
+};
+
+export async function getEquipoHistorial(
+  equipoId: string
+): Promise<{ ok: boolean; data?: HistorialEntry[]; error?: string }> {
+  const session = await auth();
+  if (!session) return { ok: false, error: "No autenticado" };
+
+  try {
+    const [ots, incidencias] = await Promise.all([
+      db.ordenTrabajo.findMany({
+        where:   { equipoId },
+        select:  {
+          id: true, numero: true, titulo: true, estado: true,
+          programada: true, costo: true,
+          tecnico: { select: { nombre: true } },
+        },
+        orderBy: { programada: "desc" },
+        take:    30,
+      }),
+      db.incidencia.findMany({
+        where:   { equipoId },
+        select:  { id: true, numero: true, titulo: true, estado: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+        take:    30,
+      }),
+    ]);
+
+    const entries: HistorialEntry[] = [
+      ...ots.map((o) => ({
+        tipo:          "ot" as const,
+        id:            o.id,
+        numero:        o.numero,
+        titulo:        o.titulo,
+        estado:        o.estado,
+        fecha:         o.programada,
+        tecnicoNombre: o.tecnico?.nombre,
+        costo:         o.costo ? Number(o.costo) : undefined,
+      })),
+      ...incidencias.map((i) => ({
+        tipo:   "incidencia" as const,
+        id:     i.id,
+        numero: i.numero,
+        titulo: i.titulo,
+        estado: i.estado,
+        fecha:  i.createdAt,
+      })),
+    ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
+
+    return { ok: true, data: entries };
+  } catch {
+    return { ok: false, error: "Error al cargar historial" };
+  }
+}

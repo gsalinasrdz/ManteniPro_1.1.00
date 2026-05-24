@@ -146,9 +146,10 @@ interface PmDrawerProps {
   pm:           PreventivoConRelaciones | null;
   onClose:      () => void;
   onCompletar:  (pmId: string) => void;
+  onCrearOT?:   (pm: PreventivoConRelaciones) => void;
 }
 
-export function PmDrawer({ pm, onClose, onCompletar }: PmDrawerProps) {
+export function PmDrawer({ pm, onClose, onCompletar, onCrearOT }: PmDrawerProps) {
   const isOpen = Boolean(pm);
 
   const canComplete = pm
@@ -281,6 +282,20 @@ export function PmDrawer({ pm, onClose, onCompletar }: PmDrawerProps) {
 
             {/* Actions footer */}
             <div className="flex flex-col gap-2 border-t border-border px-5 py-4">
+              {pm.estado === "VENCIDO" && onCrearOT && (
+                <div className="mb-1 flex items-start gap-3 rounded-lg border border-status-danger/30 bg-status-danger-bg p-3">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0 text-status-danger" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-status-danger">PM vencido — se recomienda generar una OT</p>
+                    <button
+                      onClick={() => onCrearOT(pm)}
+                      className="mt-1.5 h-7 rounded-md bg-status-danger px-3 text-[11px] font-medium text-white hover:opacity-90"
+                    >
+                      Crear OT de mantenimiento
+                    </button>
+                  </div>
+                </div>
+              )}
               {canComplete ? (
                 <>
                   <span className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-tertiary">

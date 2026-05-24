@@ -1,14 +1,18 @@
 "use client";
 
+import { useState, useTransition, useEffect } from "react";
 import {
   X, Wrench, MapPin, Gauge, Calendar, Clock,
   CheckCircle2, AlertTriangle, Settings,
+  ClipboardList, AlertCircle, Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/atoms/badge";
 import type { Equipo, Sucursal } from "@prisma/client";
+import { getEquipoHistorial } from "@/lib/actions/equipo";
+import type { HistorialEntry } from "@/lib/actions/equipo";
 
 // ── Type export ────────────────────────────────────────────────
 
@@ -144,9 +148,103 @@ interface EquipoDrawerProps {
   onTransition: (equipoId: string, nextEstado: string) => void;
 }
 
+// ── Historial tab ──────────────────────────────────────────────
+
+const OT_ESTADO_TONE: Record<string, string> = {
+  PROGRAMADA: "bg-bg-tertiary text-text-tertiary",
+  ASIGNADA:   "bg-blue-50 text-brand-blue",
+  EN_PROCESO: "bg-status-warn-bg text-status-warn",
+  CERRADA:    "bg-status-ok-bg text-status-ok",
+  CANCELADA:  "bg-bg-tertiary text-text-tertiary",
+};
+const INC_ESTADO_TONE: Record<string, string> = {
+  EVALUACION:  "bg-status-warn-bg text-status-warn",
+  EN_ATENCION: "bg-blue-50 text-brand-blue",
+  CERRADA:     "bg-status-ok-bg text-status-ok",
+  DESCARTADA:  "bg-bg-tertiary text-text-tertiary",
+};
+
+function HistorialTab({ equipoId }: { equipoId: string }) {
+  const [historial, setHistorial] = useState<HistorialEntry[] | null>(null);
+  const [pending, start]          = useTransition();
+
+  useEffect(() => {
+    start(async () => {
+      const res = await getEquipoHistorial(equipoId);
+      if (res.ok) setHistorial(res.data ?? []);
+    });
+  }, [equipoId]);
+
+  if (pending || historial === null) {
+    return (
+      <div className="flex h-40 items-center justify-center">
+        <Loader2 size={18} className="animate-spin text-text-tertiary" />
+      </div>
+    );
+  }
+  if (historial.length === 0) {
+    return (
+      <div className="flex h-40 flex-col items-center justify-center gap-2 text-text-tertiary">
+        <ClipboardList size={22} className="opacity-40" />
+        <p className="text-xs">Sin historial de OTs ni incidencias</p>
+      </div>
+    );
+  }
+
+  const costoTotal = historial
+    .filter((e) => e.tipo === "ot" && e.costo)
+    .reduce((s, e) => s + (e.costo ?? 0), 0);
+
+  return (
+    <div className="flex flex-col gap-3">
+      {costoTotal > 0 && (
+        <div className="rounded-lg border border-border bg-bg-secondary px-4 py-2.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-text-tertiary">Costo acumulado OTs</span>
+          <div className="mt-0.5 text-sm font-semibold text-text-primary">
+            ${costoTotal.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+          </div>
+        </div>
+      )}
+      {historial.map((e) => {
+        const isOT   = e.tipo === "ot";
+        const tone   = isOT ? (OT_ESTADO_TONE[e.estado] ?? "") : (INC_ESTADO_TONE[e.estado] ?? "");
+        const Icon   = isOT ? ClipboardList : AlertCircle;
+        return (
+          <div key={e.id} className="flex gap-3">
+            <div className="flex flex-col items-center">
+              <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", isOT ? "bg-blue-50" : "bg-status-warn-bg")}>
+                <Icon size={12} className={isOT ? "text-brand-blue" : "text-status-warn"} />
+              </div>
+              <div className="w-px flex-1 bg-border" />
+            </div>
+            <div className="mb-3 min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-[10px] text-text-tertiary">{e.numero}</span>
+                <span className={cn("rounded-full px-1.5 py-px text-[9px] font-semibold", tone)}>{e.estado}</span>
+              </div>
+              <p className="mt-0.5 text-xs font-medium text-text-primary leading-snug line-clamp-2">{e.titulo}</p>
+              <div className="mt-1 flex items-center gap-2 text-[10px] text-text-tertiary">
+                <span>{format(new Date(e.fecha), "d MMM yyyy", { locale: es })}</span>
+                {e.tecnicoNombre && <span>· {e.tecnicoNombre}</span>}
+                {e.costo && <span>· ${Number(e.costo).toLocaleString("es-MX", { minimumFractionDigits: 0 })}</span>}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Drawer ─────────────────────────────────────────────────────
+
 export function EquipoDrawer({ equipo, onClose, onTransition }: EquipoDrawerProps) {
-  const isOpen = Boolean(equipo);
+  const isOpen  = Boolean(equipo);
   const actions = equipo ? getActions(equipo.estado) : [];
+  const [tab, setTab] = useState<"info" | "historial">("info");
+
+  // Reset tab when equipo changes
+  useEffect(() => { setTab("info"); }, [equipo?.id]);
 
   return (
     <>
@@ -182,8 +280,30 @@ export function EquipoDrawer({ equipo, onClose, onTransition }: EquipoDrawerProp
               </button>
             </div>
 
+            {/* Tabs */}
+            <div className="flex border-b border-border">
+              {(["info", "historial"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={cn(
+                    "flex-1 py-2.5 text-xs font-medium transition-colors",
+                    tab === t
+                      ? "border-b-2 border-brand-blue text-brand-blue"
+                      : "text-text-secondary hover:text-text-primary"
+                  )}
+                >
+                  {t === "info" ? "Información" : "Historial"}
+                </button>
+              ))}
+            </div>
+
             {/* Scrollable body */}
             <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
+              {tab === "historial" ? (
+                <HistorialTab equipoId={equipo.id} />
+              ) : (
+              <>
               {/* Estado indicator */}
               <EstadoIndicator estado={equipo.estado} />
 
@@ -243,6 +363,8 @@ export function EquipoDrawer({ equipo, onClose, onTransition }: EquipoDrawerProp
                 <div className="rounded-lg border border-border bg-bg-tertiary px-4 py-3 text-sm text-text-tertiary">
                   Este equipo está dado de baja y no puede ser gestionado.
                 </div>
+              )}
+              </>
               )}
             </div>
 

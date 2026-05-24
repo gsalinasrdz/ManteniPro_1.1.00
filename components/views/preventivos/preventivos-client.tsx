@@ -16,6 +16,7 @@ import { PmDrawer, calcNextProx } from "@/components/views/preventivos/pm-drawer
 import type { PreventivoConRelaciones } from "@/components/views/preventivos/pm-drawer";
 import { NuevoPMModal } from "@/components/views/preventivos/nuevo-pm-modal";
 import { completarPM } from "@/lib/actions/preventivo";
+import { crearOrdenTrabajo } from "@/lib/actions/ot";
 
 export type { PreventivoConRelaciones };
 
@@ -118,6 +119,22 @@ export function PreventivoClient({
       return true;
     });
   }, [preventivos, sucursalId, busqueda, soloUrgentes]);
+
+  async function handleCrearOT(pm: PreventivoConRelaciones) {
+    const res = await crearOrdenTrabajo({
+      equipoId:    pm.equipoId,
+      tipo:        "PREVENTIVO",
+      prioridad:   "ALTA",
+      titulo:      `PM vencido: ${pm.tarea}`,
+      descripcion: `Orden generada desde preventivo ${pm.codigo} vencido.`,
+      tecnicoId:   pm.tecnicoId ?? "",
+      fecha:       new Date().toISOString().slice(0, 10),
+    });
+    if (!res.ok) { toast.error("Error al crear OT", { description: res.error }); return; }
+    toast.success("OT creada", { description: `Ir a Órdenes para asignar técnico.` });
+    setSelectedPm(null);
+    router.refresh();
+  }
 
   async function handleCompletar(pmId: string) {
     const pm = preventivos.find((p) => p.id === pmId);
@@ -309,6 +326,7 @@ export function PreventivoClient({
         pm={selectedPm}
         onClose={() => setSelectedPm(null)}
         onCompletar={handleCompletar}
+        onCrearOT={handleCrearOT}
       />
 
       <NuevoPMModal
