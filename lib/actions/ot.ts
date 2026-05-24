@@ -2,7 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { EstadoOT, TipoOT, Prioridad } from "@prisma/client";
+import { EstadoOT, TipoOT, Prioridad, EstadoEquipo, EstadoIncidencia } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
@@ -16,6 +16,11 @@ export async function transitionOT(
 
   const now = new Date();
   try {
+    const ot = await db.ordenTrabajo.findUnique({
+      where:  { id: otId },
+      select: { equipoId: true },
+    });
+
     await db.ordenTrabajo.update({
       where: { id: otId },
       data: {
@@ -24,7 +29,26 @@ export async function transitionOT(
         ...(nextEstado === "CERRADA"    && { cerrada:  now }),
       },
     });
+
+    // When OT closes: restore equipo to OPERATIVO if no active incidencias remain
+    if (nextEstado === "CERRADA" && ot) {
+      const incActivas = await db.incidencia.count({
+        where: {
+          equipoId: ot.equipoId,
+          estado:   { in: [EstadoIncidencia.EVALUACION, EstadoIncidencia.EN_ATENCION] },
+        },
+      });
+      if (incActivas === 0) {
+        await db.equipo.updateMany({
+          where: { id: ot.equipoId, estado: EstadoEquipo.MANTENIMIENTO },
+          data:  { estado: EstadoEquipo.OPERATIVO },
+        });
+      }
+    }
+
     revalidatePath("/ordenes");
+    revalidatePath("/equipos");
+    revalidatePath("/");
     return { ok: true };
   } catch {
     return { ok: false, error: "Error al actualizar la OT" };

@@ -17,7 +17,7 @@ export default async function OrdenesPage() {
       ? { tecnicoId: session!.user.id }
       : { equipo: equipoWhere };
 
-  const [ordenes, sucursales, equiposTodos, tecnicos, zonas] = await Promise.all([
+  const [ordenes, sucursales, equiposTodos, tecnicos, zonas, tecnicoOTCounts] = await Promise.all([
     db.ordenTrabajo.findMany({
       where: otWhere,
       include: {
@@ -72,12 +72,26 @@ export default async function OrdenesPage() {
       select:  { id: true, nombre: true },
       orderBy: { nombre: "asc" },
     }),
+    db.ordenTrabajo.groupBy({
+      by:    ["tecnicoId"],
+      where: {
+        equipo:    equipoWhere,
+        estado:    { in: ["PROGRAMADA", "ASIGNADA", "EN_PROCESO"] },
+        tecnicoId: { not: null },
+      },
+      _count: { id: true },
+    }),
   ]);
 
   const equiposPorSucursal: Record<string, { id: string; cu: string; tipo: string; area: string }[]> = {};
   for (const eq of equiposTodos) {
     if (!equiposPorSucursal[eq.sucursalId]) equiposPorSucursal[eq.sucursalId] = [];
     equiposPorSucursal[eq.sucursalId]!.push({ id: eq.id, cu: eq.cu, tipo: eq.tipo, area: eq.area });
+  }
+
+  const tecnicoCargas: Record<string, number> = {};
+  for (const row of tecnicoOTCounts) {
+    if (row.tecnicoId) tecnicoCargas[row.tecnicoId] = row._count.id;
   }
 
   return (
@@ -88,6 +102,7 @@ export default async function OrdenesPage() {
       puedeFiltraSucursal={rol !== "GERENTE_SUCURSAL"}
       equiposPorSucursal={equiposPorSucursal}
       tecnicos={tecnicos}
+      tecnicoCargas={tecnicoCargas}
     />
   );
 }

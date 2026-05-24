@@ -59,6 +59,7 @@ export default async function DashboardLayout({
         <Topbar
           empresaNombre={empresa?.nombre ?? ""}
           title="Resumen general"
+          alertCount={alertCount}
         />
         <div className="flex-1 overflow-y-auto bg-bg-tertiary p-6">
           {children}

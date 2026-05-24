@@ -32,6 +32,7 @@ interface NuevaOTModalProps {
   sucursales:         SucursalOption[];
   equiposPorSucursal: Record<string, EquipoOption[]>;
   tecnicos:           TecnicoOption[];
+  tecnicoCargas:      Record<string, number>;
 }
 
 interface FormState {
@@ -158,12 +159,14 @@ function DetallesStep({
   sucursales,
   equiposPorSucursal,
   tecnicos,
+  tecnicoCargas,
 }: {
   form:               FormState;
   onChange:           (patch: Partial<FormState>) => void;
   sucursales:         SucursalOption[];
   equiposPorSucursal: Record<string, EquipoOption[]>;
   tecnicos:           TecnicoOption[];
+  tecnicoCargas:      Record<string, number>;
 }) {
   const sucursal = sucursales.find((s) => s.id === form.sucursalId);
   const equipos  = equiposPorSucursal[form.sucursalId] ?? [];
@@ -277,21 +280,40 @@ function DetallesStep({
       {/* Técnico + Fecha en fila */}
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs font-medium text-text-secondary">
-            Técnico{" "}
-            <span className="font-normal text-text-tertiary">(opcional)</span>
-          </Label>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-medium text-text-secondary">
+              Técnico{" "}
+              <span className="font-normal text-text-tertiary">(opcional)</span>
+            </Label>
+            {tecnicos.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const min = tecnicos.reduce((prev, cur) =>
+                    (tecnicoCargas[cur.id] ?? 0) < (tecnicoCargas[prev.id] ?? 0) ? cur : prev
+                  );
+                  onChange({ tecnicoId: min.id });
+                }}
+                className="text-[10px] font-medium text-brand-blue hover:underline"
+              >
+                Sugerir
+              </button>
+            )}
+          </div>
           <select
             value={form.tecnicoId}
             onChange={(e) => onChange({ tecnicoId: e.target.value })}
             className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm text-text-primary outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
           >
             <option value="">Sin asignar</option>
-            {tecnicos.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.iniciales} — {t.nombre}
-              </option>
-            ))}
+            {tecnicos.map((t) => {
+              const carga = tecnicoCargas[t.id] ?? 0;
+              return (
+                <option key={t.id} value={t.id}>
+                  {t.iniciales} — {t.nombre}{carga > 0 ? ` (${carga} OT${carga !== 1 ? "s" : ""})` : ""}
+                </option>
+              );
+            })}
           </select>
         </div>
         <div className="flex flex-col gap-1.5">
@@ -319,6 +341,7 @@ export function NuevaOTModal({
   sucursales,
   equiposPorSucursal,
   tecnicos,
+  tecnicoCargas,
 }: NuevaOTModalProps) {
   const router = useRouter();
   const [step, setStep]       = useState<1 | 2>(1);
@@ -409,6 +432,7 @@ export function NuevaOTModal({
               sucursales={sucursales}
               equiposPorSucursal={equiposPorSucursal}
               tecnicos={tecnicos}
+              tecnicoCargas={tecnicoCargas}
             />
           )}
         </div>

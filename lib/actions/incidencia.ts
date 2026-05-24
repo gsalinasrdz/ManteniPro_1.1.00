@@ -2,7 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { EstadoIncidencia, Severidad } from "@prisma/client";
+import { EstadoIncidencia, Severidad, EstadoEquipo } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
@@ -15,11 +15,39 @@ export async function transitionIncidencia(
   if (!session) return { ok: false, error: "No autenticado" };
 
   try {
+    const inc = await db.incidencia.findUnique({
+      where:  { id: incId },
+      select: { equipoId: true },
+    });
+
     await db.incidencia.update({
       where: { id: incId },
       data:  { estado: nextEstado as EstadoIncidencia },
     });
+
+    // When closing/discarding: restore equipo to OPERATIVO if no other active incidencias
+    if (
+      inc &&
+      (nextEstado === "CERRADA" || nextEstado === "DESCARTADA")
+    ) {
+      const activasRestantes = await db.incidencia.count({
+        where: {
+          equipoId: inc.equipoId,
+          id:       { not: incId },
+          estado:   { in: [EstadoIncidencia.EVALUACION, EstadoIncidencia.EN_ATENCION] },
+        },
+      });
+      if (activasRestantes === 0) {
+        await db.equipo.updateMany({
+          where: { id: inc.equipoId, estado: EstadoEquipo.FALLA },
+          data:  { estado: EstadoEquipo.OPERATIVO },
+        });
+      }
+    }
+
     revalidatePath("/incidencias");
+    revalidatePath("/equipos");
+    revalidatePath("/");
     return { ok: true };
   } catch {
     return { ok: false, error: "Error al actualizar la incidencia" };
@@ -70,8 +98,16 @@ export async function generarOTDesdeIncidencia(
       data:  { ordenId: ot.id, estado: "EN_ATENCION" },
     });
 
+    // Equipo pasa a MANTENIMIENTO al generar una OT
+    await db.equipo.updateMany({
+      where: { id: inc.equipoId, estado: { not: EstadoEquipo.BAJA } },
+      data:  { estado: EstadoEquipo.MANTENIMIENTO },
+    });
+
     revalidatePath("/incidencias");
     revalidatePath("/ordenes");
+    revalidatePath("/equipos");
+    revalidatePath("/");
     return { ok: true, otNumero: numero };
   } catch {
     return { ok: false, error: "Error al generar la OT" };
@@ -111,7 +147,16 @@ export async function crearIncidencia(input: {
         evidencias:  [],
       },
     });
+
+    // Equipo pasa automáticamente a FALLA al reportar incidencia
+    await db.equipo.updateMany({
+      where: { id: input.equipoId, estado: { not: EstadoEquipo.BAJA } },
+      data:  { estado: EstadoEquipo.FALLA },
+    });
+
     revalidatePath("/incidencias");
+    revalidatePath("/equipos");
+    revalidatePath("/");
     return { ok: true };
   } catch {
     return { ok: false, error: "Error al reportar la incidencia" };

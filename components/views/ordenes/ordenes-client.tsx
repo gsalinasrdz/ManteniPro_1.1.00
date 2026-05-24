@@ -37,6 +37,7 @@ interface OrdenesClientProps {
   puedeFiltraSucursal: boolean;
   equiposPorSucursal: Record<string, EquipoOption[]>;
   tecnicos: TecnicoOption[];
+  tecnicoCargas: Record<string, number>;
 }
 
 const TIPO_LABEL: Record<string, string> = {
@@ -92,6 +93,7 @@ export function OrdenesClient({
   puedeFiltraSucursal,
   equiposPorSucursal,
   tecnicos,
+  tecnicoCargas,
 }: OrdenesClientProps) {
   const router = useRouter();
   const { zonaId, sucursalId, setSucursalId } = useGlobalFilters();
@@ -455,6 +457,7 @@ export function OrdenesClient({
         sucursales={sucursales}
         equiposPorSucursal={equiposPorSucursal}
         tecnicos={tecnicos}
+        tecnicoCargas={tecnicoCargas}
       />
     </>
   );
