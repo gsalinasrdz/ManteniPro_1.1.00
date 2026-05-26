@@ -30,8 +30,16 @@ export async function transitionOT(
       },
     });
 
-    // When OT closes: restore equipo to OPERATIVO if no active incidencias remain
+    // When OT closes: auto-close the linked incidencia, then restore equipo if clear
     if (nextEstado === "CERRADA" && ot) {
+      await db.incidencia.updateMany({
+        where: {
+          ordenId: otId,
+          estado:  { in: [EstadoIncidencia.EVALUACION, EstadoIncidencia.EN_ATENCION] },
+        },
+        data: { estado: EstadoIncidencia.CERRADA },
+      });
+
       const incActivas = await db.incidencia.count({
         where: {
           equipoId: ot.equipoId,
@@ -47,6 +55,7 @@ export async function transitionOT(
     }
 
     revalidatePath("/ordenes");
+    revalidatePath("/incidencias");
     revalidatePath("/equipos");
     revalidatePath("/");
     return { ok: true };

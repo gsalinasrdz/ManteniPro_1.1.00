@@ -21,8 +21,13 @@ test("importar XML CFDI — preview y aplicar", async ({ page }) => {
   await expect(page.getByText(/Proveedor TEST/i).first()).toBeVisible();
 
   // ── 4. Cambiar línea 2 a "omitir" ────────────────────────────
-  const filaXml = page.getByRole("row", { name: /TEST-XML-999/i });
-  await filaXml.getByRole("combobox").selectOption("omitir");
+  // XML preview renders 2 cards, each with a checkbox (incluir).
+  // TEST-XML-999 is line index 1 → nth(1). Uncheck sets accion="omitir".
+  await page
+    .getByRole("dialog")
+    .locator('input[type="checkbox"]')
+    .nth(1)
+    .uncheck();
 
   // ── 5. Aplicar importación ───────────────────────────────────
   await page.getByRole("button", { name: /aplicar importación/i }).click();

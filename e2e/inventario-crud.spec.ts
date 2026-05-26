@@ -7,6 +7,32 @@ const NOMBRE = "[TEST] Filtro aceite";
 test("CRUD completo de refacción con ajuste de stock", async ({ page }) => {
   await page.goto("/inventario");
 
+  // ── 0. Cleanup: eliminar TEST-001 si quedó de una corrida anterior ──
+  // "Eliminar refacción" solo aparece cuando stock===0 y el drawer usa selectedRef que es stale
+  // tras router.refresh(). Fix: leer stock del row, drenarlo con Salida, recargar página, eliminar.
+  const cleanupRow = page.getByRole("row", { name: /TEST-001/i });
+  if (await cleanupRow.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    const stockText = await cleanupRow.locator("span.tabular-nums").first().innerText();
+    const currentStock = parseInt(stockText, 10) || 0;
+
+    if (currentStock > 0) {
+      await cleanupRow.click();
+      await page.getByPlaceholder("Cantidad").fill(String(currentStock));
+      await page.getByRole("button", { name: /^salida$/i }).click();
+      // Wait for the table row to reflect stock=0 before reloading
+      await expect(
+        page.getByRole("row", { name: /TEST-001/i }).locator("span.tabular-nums").first()
+      ).toHaveText("0", { timeout: 8_000 });
+      // Reload to get fresh selectedRef with stock=0
+      await page.goto("/inventario");
+    }
+
+    await page.getByRole("row", { name: /TEST-001/i }).click();
+    await page.getByRole("button", { name: /eliminar refacción/i }).click();
+    await page.getByRole("button", { name: /confirmar eliminación/i }).click();
+    await expect(page.getByRole("row", { name: /TEST-001/i })).toHaveCount(0, { timeout: 8_000 });
+  }
+
   // ── 1. Crear ────────────────────────────────────────────────
   await page.getByRole("button", { name: /nueva refacción/i }).click();
 
@@ -59,19 +85,19 @@ test("CRUD completo de refacción con ajuste de stock", async ({ page }) => {
   ).toBeVisible({ timeout: 5_000 });
 
   // ── 5. Salida total hasta stock 0 ────────────────────────────
-  await page.getByRole("row", { name: new RegExp(SKU, "i") }).click();
+  // Drawer is already open after the edit step — no row click needed
   await page.getByPlaceholder("Cantidad").fill("20");
   await page.getByRole("button", { name: /^salida$/i }).click();
+  // Wait for table to reflect stock=0 (span.tabular-nums inside the row)
   await expect(
-    page.getByRole("row", { name: new RegExp(SKU, "i") }).getByText("0")
-  ).toBeVisible({ timeout: 8_000 });
+    page.getByRole("row", { name: new RegExp(SKU, "i") }).locator("span.tabular-nums").first()
+  ).toHaveText("0", { timeout: 8_000 });
 
   // ── 6. Eliminar ──────────────────────────────────────────────
-  // Drawer should still be open, click "Eliminar refacción"
+  // selectedRef is stale after router.refresh() — reload to get fresh data with stock=0
+  await page.goto("/inventario");
+  await page.getByRole("row", { name: new RegExp(SKU, "i") }).click();
   await page.getByRole("button", { name: /eliminar refacción/i }).click();
-  // Confirmation appears — click "Confirmar eliminación"
   await page.getByRole("button", { name: /confirmar eliminación/i }).click();
-
-  // Verify gone from table
   await expect(page.getByRole("cell", { name: SKU })).toHaveCount(0, { timeout: 10_000 });
 });
