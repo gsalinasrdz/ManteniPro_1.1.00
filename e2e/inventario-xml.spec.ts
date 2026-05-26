@@ -16,9 +16,9 @@ test("importar XML CFDI — preview y aplicar", async ({ page }) => {
   await fileInput.setInputFiles(XML_PATH);
 
   // ── 3. Verificar step preview con 2 líneas ───────────────────
-  await expect(page.getByText(/FRE-004/i)).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText(/TEST-XML-999/i)).toBeVisible({ timeout: 5_000 });
-  await expect(page.getByText(/Proveedor TEST/i)).toBeVisible();
+  await expect(page.getByText(/FRE-004/i).first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/TEST-XML-999/i).first()).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText(/Proveedor TEST/i).first()).toBeVisible();
 
   // ── 4. Cambiar línea 2 a "omitir" ────────────────────────────
   const filaXml = page.getByRole("row", { name: /TEST-XML-999/i });
@@ -29,7 +29,7 @@ test("importar XML CFDI — preview y aplicar", async ({ page }) => {
 
   // Toast de éxito — al menos 1 actualizada o creada
   await expect(
-    page.getByText(/1 .*(actualiz|cre)/i)
+    page.getByText(/1 .*(actualiz|cre)/i).first()
   ).toBeVisible({ timeout: 10_000 });
 
   // ── 6. Verificar FRE-004 sigue en inventario ─────────────────
