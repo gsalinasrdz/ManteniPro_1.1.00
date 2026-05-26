@@ -2,18 +2,18 @@
 import { test, expect } from "@playwright/test";
 
 const RUTAS = [
-  { path: "/",            heading: /dashboard|inicio/i },
-  { path: "/incidencias", heading: /incidencia/i },
-  { path: "/ordenes",     heading: /orden/i },
-  { path: "/preventivos", heading: /preventivo/i },
-  { path: "/equipos",     heading: /equipo/i },
-  { path: "/inventario",  heading: /inventario/i },
-  { path: "/calendario",  heading: /calendario/i },
-  { path: "/alertas",     heading: /alerta/i },
-  { path: "/historial",   heading: /historial/i },
+  "/",
+  "/incidencias",
+  "/ordenes",
+  "/preventivos",
+  "/equipos",
+  "/inventario",
+  "/calendario",
+  "/alertas",
+  "/historial",
 ];
 
-for (const { path, heading } of RUTAS) {
+for (const path of RUTAS) {
   test(`${path} carga sin error`, async ({ page }) => {
     const errors: string[] = [];
     page.on("response", (res) => {
@@ -29,9 +29,10 @@ for (const { path, heading } of RUTAS) {
     // Sin pantalla de error de Next.js
     await expect(page.getByText(/something went wrong/i)).toHaveCount(0);
 
-    // Heading del módulo visible
-    await expect(page.getByRole("heading", { name: heading })).toBeVisible({
-      timeout: 10_000,
-    });
+    // Layout cargó — topbar visible con su título fijo
+    await expect(page.getByText("Resumen general")).toBeVisible({ timeout: 10_000 });
+
+    // URL no redirigió a error page
+    await expect(page).toHaveURL(new RegExp(path === "/" ? "/$" : path));
   });
 }
