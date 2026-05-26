@@ -4,6 +4,7 @@ import { test, expect } from "@playwright/test";
 const TITULO = "[TEST] Falla bomba agua";
 
 test("flujo completo: incidencia → OT → cierre → equipo OPERATIVO", async ({ page }) => {
+  test.setTimeout(90_000);
   // ── 1. Reportar incidencia ──────────────────────────────────
   await page.goto("/incidencias");
   await page.getByRole("button", { name: /^reportar$/i }).click();
@@ -39,6 +40,8 @@ test("flujo completo: incidencia → OT → cierre → equipo OPERATIVO", async 
   // Client applies optimistic update immediately; Generar OT renders for EN_ATENCION + no OT
   await expect(page.getByRole("button", { name: /generar ot/i })).toBeVisible({ timeout: 5_000 });
   await page.getByRole("button", { name: /generar ot/i }).click();
+  // Wait for the success toast — proves the server action finished and OT is in DB
+  await expect(page.getByText(/OT generada/i)).toBeVisible({ timeout: 10_000 });
 
   // ── 4. Verificar OT en /ordenes ─────────────────────────────
   await page.goto("/ordenes");
