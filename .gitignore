@@ -5,3 +5,6 @@ node_modules
 .next
 tsconfig.tsbuildinfo
 .vercel
+
+# Playwright auth state
+e2e/.auth/
