@@ -29,7 +29,8 @@ test("flujo completo: incidencia → OT → cierre → equipo OPERATIVO", async 
   await page.getByRole("button", { name: /reportar incidencia/i }).click();
 
   // ── 2. Verificar en tabla ────────────────────────────────────
-  await expect(page.getByText(TITULO)).toBeVisible({ timeout: 10_000 });
+  // .first() — previous failed runs may leave leftover [TEST] rows in the table
+  await expect(page.getByText(TITULO).first()).toBeVisible({ timeout: 10_000 });
 
   // ── 3. Generar OT desde el drawer ───────────────────────────
   // Use .first() — table is desc by date, newest row is first; handles leftover [TEST] rows
@@ -45,7 +46,7 @@ test("flujo completo: incidencia → OT → cierre → equipo OPERATIVO", async 
 
   // ── 4. Verificar OT en /ordenes ─────────────────────────────
   await page.goto("/ordenes");
-  await expect(page.getByText(TITULO)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(TITULO).first()).toBeVisible({ timeout: 10_000 });
 
   // ── 5. Cerrar la OT via transiciones de estado ───────────────
   await page.getByRole("row").filter({ hasText: TITULO }).first().click();
