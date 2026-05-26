@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cfdi:Comprobante
+  xmlns:cfdi="http://www.sat.gob.mx/cfd/4"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.sat.gob.mx/cfd/4 cfdv40.xsd"
+  Version="4.0"
+  Folio="TEST-001"
+  Fecha="2026-05-26T10:00:00"
+  Sello="TESTSELLO=="
+  FormaPago="99"
+  NoCertificado="00000000000000000000"
+  Certificado="TESTCERT=="
+  SubTotal="1500.00"
+  Total="1740.00"
+  Moneda="MXN"
+  TipoDeComprobante="I"
+  Exportacion="01"
+  MetodoPago="PUE"
+  LugarExpedicion="25000">
+  <cfdi:Emisor
+    Rfc="PROV010101AAA"
+    Nombre="Proveedor TEST SA de CV"
+    RegimenFiscal="601"/>
+  <cfdi:Receptor
+    Rfc="CLIE010101BBB"
+    Nombre="Sabor Express SA de CV"
+    DomicilioFiscalReceptor="25000"
+    RegimenFiscalReceptor="601"
+    UsoCFDI="G03"/>
+  <cfdi:Conceptos>
+    <cfdi:Concepto
+      ClaveProdServ="25191513"
+      NoIdentificacion="FRE-004"
+      Cantidad="10"
+      ClaveUnidad="H87"
+      Unidad="Pieza"
+      Descripcion="Filtro de refrigerante industrial"
+      ValorUnitario="100.00"
+      Importe="1000.00"
+      ObjetoImp="02"/>
+    <cfdi:Concepto
+      ClaveProdServ="25191513"
+      NoIdentificacion="TEST-XML-999"
+      Cantidad="5"
+      ClaveUnidad="H87"
+      Unidad="Pieza"
+      Descripcion="Empaque de hule sellado 3/4"
+      ValorUnitario="100.00"
+      Importe="500.00"
+      ObjetoImp="02"/>
+  </cfdi:Conceptos>
+  <cfdi:Complemento>
+    <tfd:TimbreFiscalDigital
+      xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital"
+      Version="1.1"
+      UUID="AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"
+      FechaTimbrado="2026-05-26T10:00:01"
+      RfcProvCertif="SAT010101000"
+      SelloCFD="TESTSELLO=="
+      NoCertificadoSAT="00000000000000000000"
+      SelloSAT="TESTSAT=="/>
+  </cfdi:Complemento>
+</cfdi:Comprobante>
