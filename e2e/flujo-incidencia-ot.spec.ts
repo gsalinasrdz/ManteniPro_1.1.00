@@ -77,15 +77,21 @@ test("flujo completo: incidencia → OT → cierre → equipo OPERATIVO", async 
   // Client applies optimistic update immediately; Generar OT renders for EN_ATENCION + no OT
   await expect(page.getByRole("button", { name: /generar ot/i })).toBeVisible({ timeout: 5_000 });
   await page.getByRole("button", { name: /generar ot/i }).click();
-  // Wait for the success toast — proves the server action finished and OT is in DB
+  // Wait for the success toast — description contains the new OT number: "OT-2026-XXXX creada desde…"
   await expect(page.getByText(/OT generada/i)).toBeVisible({ timeout: 10_000 });
+  const toastDesc = await page.getByText(/creada desde/i).first().textContent() ?? "";
+  const otNumeroMatch = toastDesc.match(/OT-\d{4}-\d{4}/);
+  if (!otNumeroMatch) throw new Error(`OT number not found in toast: "${toastDesc}"`);
+  const otNumero = otNumeroMatch[0];
 
   // ── 4. Verificar OT en /ordenes ─────────────────────────────
   await page.goto("/ordenes");
-  await expect(page.getByText(TITULO).first()).toBeVisible({ timeout: 10_000 });
+  // Wait for the exact OT number — guards against Vercel edge cache returning a stale snapshot
+  await expect(page.getByText(otNumero).first()).toBeVisible({ timeout: 15_000 });
 
   // ── 5. Cerrar la OT via transiciones de estado ───────────────
-  await page.getByRole("row").filter({ hasText: TITULO }).first().click();
+  // Filter by extracted OT number — avoids clicking an older [TEST] OT left from failed runs
+  await page.getByRole("row").filter({ hasText: otNumero }).click();
   // PROGRAMADA → ASIGNADA
   await page.getByRole("button", { name: /marcar como asignada/i }).click();
   await expect(page.getByRole("button", { name: /iniciar trabajo/i })).toBeVisible({ timeout: 5_000 });
@@ -94,8 +100,8 @@ test("flujo completo: incidencia → OT → cierre → equipo OPERATIVO", async 
   await expect(page.getByRole("button", { name: /cerrar ot/i })).toBeVisible({ timeout: 5_000 });
   // EN_PROCESO → CERRADA (transitionOT auto-closes linked incidencia via ordenId)
   await page.getByRole("button", { name: /cerrar ot/i }).click();
-  // Wait for server action to complete — button disappears on success
-  await expect(page.getByRole("button", { name: /cerrar ot/i })).not.toBeVisible({ timeout: 8_000 });
+  // Wait for toast — fires AFTER await transitionOT() resolves (DB fully updated: OT+incidencia+equipo)
+  await expect(page.getByText(/OT cerrada/i)).toBeVisible({ timeout: 10_000 });
 
   // ── 6. Verificar equipo OPERATIVO ───────────────────────────
   await page.goto("/equipos");
