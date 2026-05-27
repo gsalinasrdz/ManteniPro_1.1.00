@@ -34,8 +34,8 @@ export async function transitionOT(
     if (nextEstado === "CERRADA" && ot) {
       await db.incidencia.updateMany({
         where: {
-          ordenId: otId,
-          estado:  { in: [EstadoIncidencia.EVALUACION, EstadoIncidencia.EN_ATENCION] },
+          equipoId: ot.equipoId,
+          estado:   { in: [EstadoIncidencia.EVALUACION, EstadoIncidencia.EN_ATENCION] },
         },
         data: { estado: EstadoIncidencia.CERRADA },
       });
