@@ -18,20 +18,41 @@ export async function transitionOT(
   try {
     const ot = await db.ordenTrabajo.findUnique({
       where:  { id: otId },
-      select: { equipoId: true },
+      select: {
+        equipoId:      true,
+        costoEstimado: true,
+        facturas:      {
+          where:  { estado: { not: "CANCELADA" } },
+          select: { monto: true },
+        },
+      },
     });
+
+    if (!ot) return { ok: false, error: "OT no encontrada" };
+
+    if (nextEstado === "CERRADA") {
+      if (ot.costoEstimado === null)
+        return { ok: false, error: "Registra un presupuesto estimado antes de cerrar la OT" };
+      if (ot.facturas.length === 0)
+        return { ok: false, error: "Agrega al menos una factura antes de cerrar la OT" };
+    }
+
+    const costoReal =
+      nextEstado === "CERRADA"
+        ? ot.facturas.reduce((sum, f) => sum + Number(f.monto), 0)
+        : undefined;
 
     await db.ordenTrabajo.update({
       where: { id: otId },
       data: {
         estado: nextEstado as EstadoOT,
         ...(nextEstado === "EN_PROCESO" && { iniciada: now }),
-        ...(nextEstado === "CERRADA"    && { cerrada:  now }),
+        ...(nextEstado === "CERRADA"    && { cerrada: now, costo: costoReal }),
       },
     });
 
     // When OT closes: auto-close the linked incidencia, then restore equipo if clear
-    if (nextEstado === "CERRADA" && ot) {
+    if (nextEstado === "CERRADA") {
       await db.incidencia.updateMany({
         where: {
           equipoId: ot.equipoId,
@@ -126,8 +147,9 @@ export async function crearOrdenTrabajo(input: {
   prioridad:   string;
   titulo:      string;
   descripcion: string;
-  tecnicoId:   string;
-  fecha:       string;
+  tecnicoId:     string;
+  fecha:         string;
+  costoEstimado?: number;
 }): Promise<ActionResult> {
   const session = await auth();
   if (!session) return { ok: false, error: "No autenticado" };
@@ -155,8 +177,9 @@ export async function crearOrdenTrabajo(input: {
         tecnicoId:   input.tecnicoId   || null,
         creadorId:   session.user.id,
         programada:  new Date(input.fecha),
-        estado:      "PROGRAMADA",
-        evidencias:  [],
+        costoEstimado: input.costoEstimado ?? null,
+        estado:        "PROGRAMADA",
+        evidencias:    [],
       },
     });
     revalidatePath("/ordenes");

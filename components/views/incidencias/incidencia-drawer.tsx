@@ -1,8 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   X, Wrench, MapPin, User, Clock, AlertTriangle,
-  ArrowRight, CheckCircle2, Link2,
+  ArrowRight, CheckCircle2, Link2, DollarSign,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -158,11 +159,18 @@ const ACTION_CLASS: Record<string, string> = {
 interface IncidenciaDrawerProps {
   inc:          IncidenciaConRelaciones | null;
   onClose:      () => void;
-  onTransition: (incId: string, nextEstado: string) => void;
+  onTransition: (incId: string, nextEstado: string, opts?: { costoEstimado?: number }) => void;
 }
 
 export function IncidenciaDrawer({ inc, onClose, onTransition }: IncidenciaDrawerProps) {
   const isOpen = Boolean(inc);
+  const [showGenOTForm, setShowGenOTForm]       = useState(false);
+  const [presupuestoInput, setPresupuestoInput] = useState("");
+
+  useEffect(() => {
+    setShowGenOTForm(false);
+    setPresupuestoInput("");
+  }, [inc?.id]);
 
   return (
     <>
@@ -294,18 +302,68 @@ export function IncidenciaDrawer({ inc, onClose, onTransition }: IncidenciaDrawe
                 <span className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-tertiary">
                   Acciones
                 </span>
-                {getActions(inc).map((action) => (
-                  <button
-                    key={action.nextEstado}
-                    onClick={() => onTransition(inc.id, action.nextEstado)}
-                    className={cn(
-                      "h-9 rounded-lg px-4 text-sm font-medium transition-colors",
-                      ACTION_CLASS[action.variant]
-                    )}
-                  >
-                    {action.label}
-                  </button>
-                ))}
+                {getActions(inc).map((action) =>
+                  action.nextEstado === "GENERAR_OT" ? (
+                    showGenOTForm ? (
+                      <div key="genot-form" className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] text-text-tertiary">
+                            Presupuesto estimado{" "}
+                            <span className="font-normal">(opcional)</span>
+                          </label>
+                          <div className="relative">
+                            <DollarSign size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={presupuestoInput}
+                              onChange={(e) => setPresupuestoInput(e.target.value)}
+                              placeholder="0.00"
+                              className="h-8 w-full rounded-lg border border-border bg-bg-primary pl-6 pr-2 text-xs text-text-primary placeholder:text-text-tertiary focus:border-brand-blue focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { setShowGenOTForm(false); setPresupuestoInput(""); }}
+                            className="h-9 flex-1 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-bg-secondary"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={() => {
+                              onTransition(inc.id, "GENERAR_OT", {
+                                costoEstimado: presupuestoInput ? parseFloat(presupuestoInput) : undefined
+                              });
+                              setShowGenOTForm(false);
+                              setPresupuestoInput("");
+                            }}
+                            className="h-9 flex-1 rounded-lg bg-brand-blue text-xs font-medium text-white hover:bg-brand-blue/90"
+                          >
+                            Confirmar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        key="genot"
+                        onClick={() => setShowGenOTForm(true)}
+                        className={cn("h-9 rounded-lg px-4 text-sm font-medium transition-colors", ACTION_CLASS[action.variant])}
+                      >
+                        {action.label}
+                      </button>
+                    )
+                  ) : (
+                    <button
+                      key={action.nextEstado}
+                      onClick={() => onTransition(inc.id, action.nextEstado)}
+                      className={cn("h-9 rounded-lg px-4 text-sm font-medium transition-colors", ACTION_CLASS[action.variant])}
+                    >
+                      {action.label}
+                    </button>
+                  )
+                )}
               </div>
             )}
           </>

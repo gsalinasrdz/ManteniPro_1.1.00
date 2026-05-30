@@ -175,7 +175,7 @@ export function IncidenciasClient({
     });
   }, [incidencias, sucursalesEnZona, sucursalId, busqueda, soloActivas]);
 
-  async function handleTransition(incId: string, nextEstado: string) {
+  async function handleTransition(incId: string, nextEstado: string, opts?: { costoEstimado?: number }) {
     const prev = incidencias;
 
     // GENERAR_OT special action
@@ -190,7 +190,7 @@ export function IncidenciasClient({
         s?.id === incId ? { ...s, ordenId: "pending", estado: "EN_ATENCION" as Incidencia["estado"] } : s
       );
 
-      const result = await generarOTDesdeIncidencia(incId);
+      const result = await generarOTDesdeIncidencia(incId, opts?.costoEstimado);
 
       if (!result.ok) {
         setIncidencias(prev);

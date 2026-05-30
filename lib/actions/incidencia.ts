@@ -55,7 +55,8 @@ export async function transitionIncidencia(
 }
 
 export async function generarOTDesdeIncidencia(
-  incId: string
+  incId: string,
+  costoEstimado?: number
 ): Promise<ActionResult & { otNumero?: string }> {
   const session = await auth();
   if (!session) return { ok: false, error: "No autenticado" };
@@ -87,9 +88,10 @@ export async function generarOTDesdeIncidencia(
         titulo:      `Correctivo — ${inc.titulo}`,
         descripcion: inc.descripcion,
         creadorId:   session.user.id,
-        programada:  new Date(),
-        estado:      "PROGRAMADA",
-        evidencias:  [],
+        costoEstimado: costoEstimado ?? null,
+        programada:    new Date(),
+        estado:        "PROGRAMADA",
+        evidencias:    [],
       },
     });
 

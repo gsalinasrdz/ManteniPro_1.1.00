@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useTransition } from "react";
-import { X, Wrench, MapPin, Calendar, User, ArrowRight, CheckCircle2, Camera, ImageIcon, Loader2, MessageSquare, Send } from "lucide-react";
+import { X, Wrench, MapPin, Calendar, User, ArrowRight, CheckCircle2, XCircle, Camera, ImageIcon, Loader2, MessageSquare, Send } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -362,6 +362,10 @@ export function OtDrawer({ ot, tecnicos, onClose, onTransition, onAsignar, onEvi
   const isOpen = Boolean(ot);
   const [tecnicoSel, setTecnicoSel] = useState<string>("");
 
+  const costoEstimadoSet = ot?.costoEstimado !== null && ot?.costoEstimado !== undefined;
+  const facturasActivas  = ot?.facturas.filter((f) => f.estado !== "CANCELADA").length ?? 0;
+  const canClose = costoEstimadoSet && facturasActivas > 0;
+
   return (
     <>
       {/* Backdrop */}
@@ -527,14 +531,30 @@ export function OtDrawer({ ot, tecnicos, onClose, onTransition, onAsignar, onEvi
                 <span className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-tertiary">
                   Acciones
                 </span>
+                {ot.estado === "EN_PROCESO" && !canClose && (
+                  <div className="rounded-lg border border-border bg-bg-secondary px-3 py-2.5 text-[11px]">
+                    <p className="mb-1.5 font-semibold text-text-secondary">Para cerrar esta OT:</p>
+                    <div className="flex flex-col gap-1">
+                      <div className={cn("flex items-center gap-1.5", costoEstimadoSet ? "text-status-ok" : "text-status-danger")}>
+                        {costoEstimadoSet ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
+                        <span>Presupuesto estimado</span>
+                      </div>
+                      <div className={cn("flex items-center gap-1.5", facturasActivas > 0 ? "text-status-ok" : "text-status-danger")}>
+                        {facturasActivas > 0 ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
+                        <span>{facturasActivas > 0 ? `${facturasActivas} factura(s) registrada(s)` : "Sin facturas registradas"}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {(TRANSITIONS[ot.estado] ?? []).map((action) => (
                   <button
                     key={action.nextEstado}
                     onClick={() => onTransition(ot.id, action.nextEstado)}
+                    disabled={action.nextEstado === "CERRADA" && !canClose}
                     className={cn(
                       "h-9 rounded-lg px-4 text-sm font-medium transition-colors",
                       action.variant === "primary"
-                        ? "bg-brand-blue text-white hover:bg-brand-blue/90"
+                        ? "bg-brand-blue text-white hover:bg-brand-blue/90 disabled:cursor-not-allowed disabled:opacity-40"
                         : action.variant === "danger"
                         ? "bg-status-danger-bg text-status-danger hover:bg-status-danger-mid/10"
                         : "border border-border text-text-secondary hover:bg-bg-secondary"

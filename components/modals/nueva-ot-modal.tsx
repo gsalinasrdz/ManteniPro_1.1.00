@@ -36,25 +36,27 @@ interface NuevaOTModalProps {
 }
 
 interface FormState {
-  sucursalId:  string;
-  equipoId:    string;
-  tipo:        TipoOT;
-  prioridad:   Prioridad;
-  titulo:      string;
-  descripcion: string;
-  tecnicoId:   string;
-  fecha:       string;
+  sucursalId:    string;
+  equipoId:      string;
+  tipo:          TipoOT;
+  prioridad:     Prioridad;
+  titulo:        string;
+  descripcion:   string;
+  tecnicoId:     string;
+  fecha:         string;
+  costoEstimado: string;
 }
 
 const EMPTY_FORM: FormState = {
-  sucursalId:  "",
-  equipoId:    "",
-  tipo:        "CORRECTIVO",
-  prioridad:   "MEDIA",
-  titulo:      "",
-  descripcion: "",
-  tecnicoId:   "",
-  fecha:       "",
+  sucursalId:    "",
+  equipoId:      "",
+  tipo:          "CORRECTIVO",
+  prioridad:     "MEDIA",
+  titulo:        "",
+  descripcion:   "",
+  tecnicoId:     "",
+  fecha:         "",
+  costoEstimado: "",
 };
 
 // ── Visual helpers ─────────────────────────────────────────────
@@ -329,6 +331,28 @@ function DetallesStep({
           />
         </div>
       </div>
+
+      {/* Presupuesto estimado */}
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-xs font-medium text-text-secondary">
+          Presupuesto estimado{" "}
+          <span className="font-normal text-text-tertiary">(opcional)</span>
+        </Label>
+        <div className="relative">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-text-tertiary">$</span>
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.costoEstimado}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              onChange({ costoEstimado: e.target.value })
+            }
+            placeholder="0.00"
+            className="h-8 pl-6 text-sm"
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -365,13 +389,14 @@ export function NuevaOTModal({
     setLoading(true);
 
     const result = await crearOrdenTrabajo({
-      equipoId:    form.equipoId,
-      tipo:        form.tipo,
-      prioridad:   form.prioridad,
-      titulo:      form.titulo,
-      descripcion: form.descripcion,
-      tecnicoId:   form.tecnicoId,
-      fecha:       form.fecha,
+      equipoId:      form.equipoId,
+      tipo:          form.tipo,
+      prioridad:     form.prioridad,
+      titulo:        form.titulo,
+      descripcion:   form.descripcion,
+      tecnicoId:     form.tecnicoId,
+      fecha:         form.fecha,
+      costoEstimado: form.costoEstimado ? parseFloat(form.costoEstimado) : undefined,
     });
 
     setLoading(false);
