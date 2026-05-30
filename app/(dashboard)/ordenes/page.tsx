@@ -94,9 +94,21 @@ export default async function OrdenesPage() {
     if (row.tecnicoId) tecnicoCargas[row.tecnicoId] = row._count.id;
   }
 
+  const ordenesSerializables = ordenes.map((ot) => ({
+    ...ot,
+    costoEstimado: ot.costoEstimado !== null ? Number(ot.costoEstimado) : null,
+    costo:         ot.costo         !== null ? Number(ot.costo)         : null,
+    facturas: ot.facturas.map((f) => ({
+      ...f,
+      monto:    Number(f.monto),
+      subtotal: f.subtotal !== null ? Number(f.subtotal) : null,
+      iva:      f.iva      !== null ? Number(f.iva)      : null,
+    })),
+  }));
+
   return (
     <OrdenesClient
-      ordenes={ordenes as any}
+      ordenes={ordenesSerializables as any}
       sucursales={sucursales.map((s) => ({ id: s.id, nombre: s.nombre, zonaId: s.zonaId, equiposConFalla: s._count.equipos }))}
       zonas={zonas}
       puedeFiltraSucursal={rol !== "GERENTE_SUCURSAL"}
